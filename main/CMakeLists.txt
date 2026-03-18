@@ -7,7 +7,6 @@ if (_main_sources)
     target_link_libraries(RoverMain PRIVATE
         Rover::Core Rover::Scene Rover::Platform Rover::Servers Rover::Vendor
     )
-    set_target_properties(RoverMain PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}")
 else ()
     message(STATUS "[Rover] main/: no sources, skipping executable")
 endif ()
