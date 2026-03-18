@@ -1,6 +1,39 @@
----
-Checks: >-
-  modernize-use-nullptr,
-  modernize-use-bool-literals,
-  readability-simplify-boolean-expr
-WarningsAsErrors: ''
+Checks:
+  - -*
+  - bugprone-*
+  - -bugprone-easily-swappable-parameters
+  - -bugprone-narrowing-conversions
+  - cppcoreguidelines-pro-type-member-init
+  - modernize-use-nullptr
+  - modernize-use-bool-literals
+  - modernize-use-default-member-init
+  - modernize-use-override
+  - modernize-use-using
+  - modernize-deprecated-headers
+  - modernize-redundant-void-arg
+  - modernize-use-auto
+  - modernize-use-nodiscard
+  - modernize-use-starts-ends-with
+  - modernize-concat-nested-namespaces
+  - readability-braces-around-statements
+  - readability-redundant-member-init
+  - readability-qualified-auto
+  - readability-make-member-function-const
+  - readability-static-accessed-through-instance
+  - performance-for-range-copy
+  - performance-unnecessary-value-param
+  - performance-move-const-arg
+HeaderFileExtensions: ["", h, hh, hpp, hxx, inc]
+ImplementationFileExtensions: [c, cc, cpp, cxx]
+HeaderFilterRegex: (core|main|platform|scene|servers)/
+FormatStyle: file
+CheckOptions:
+  cppcoreguidelines-pro-type-member-init.IgnoreArrays: true
+  cppcoreguidelines-pro-type-member-init.UseAssignment: true
+  modernize-use-bool-literals.IgnoreMacros: false
+  modernize-use-default-member-init.IgnoreMacros: false
+  modernize-use-default-member-init.UseAssignment: true
+  modernize-use-auto.MinTypeNameLength: 5
+  modernize-use-auto.RemoveStars: false
+  performance-for-range-copy.WarnOnAllAutoCopies: true
+  performance-unnecessary-value-param.AllowedTypes: ""

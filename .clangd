@@ -1,6 +1,29 @@
 ---
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - -std=c++20
+    - -Wall
+    - -Wextra
+
 Diagnostics:
-  MissingIncludes: None
-  UnusedIncludes: None
-  Suppress:
-    - google-default-arguments
+  ClangTidy:
+    FastCheckFilter: None
+  MissingIncludes: Strict
+  UnusedIncludes: Strict
+---
+If:
+  PathMatch: .*\.(h|hh|hpp|hxx|inc)
+
+CompileFlags:
+  Add:
+    - -Wno-unneeded-internal-declaration
+    - -Wno-unused-const-variable
+    - -Wno-unused-function
+    - -Wno-unused-variable
+---
+If:
+  PathMatch: vendor/.*
+
+Diagnostics:
+  Suppress: "*"
