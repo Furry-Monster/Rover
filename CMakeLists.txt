@@ -17,17 +17,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(ROVER_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(ROVER_BIN_DIR "${ROVER_ROOT_DIR}/bin")
+string(TOLOWER "${CMAKE_BUILD_TYPE}" _build_type_lower)
+set(ROVER_BIN_DIR "${ROVER_ROOT_DIR}/bin/${_build_type_lower}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}/lib")
 
-foreach (_config Debug Release RelWithDebInfo MinSizeRel)
+foreach (_config Debug Release)
     string(TOUPPER ${_config} _config_upper)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_BIN_DIR}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_BIN_DIR}/lib")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_BIN_DIR}/lib")
+    string(TOLOWER ${_config} _config_lower)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
 endforeach ()
 
 configure_file(

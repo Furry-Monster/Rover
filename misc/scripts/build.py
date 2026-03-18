@@ -9,8 +9,6 @@ import sys
 from pathlib import Path
 
 ROVER_ROOT = Path(__file__).resolve().parent.parent.parent
-BUILD_DIR = ROVER_ROOT / "build"
-BIN_DIR = ROVER_ROOT / "bin"
 
 MULTI_CONFIG_GENERATORS = {"Visual Studio", "Xcode", "Ninja Multi-Config"}
 
@@ -38,14 +36,15 @@ def is_multi_config(generator):
 
 
 def configure(cmake_exe, build_type, generator, rebuild):
-    if rebuild and BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
-    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    build_dir = ROVER_ROOT / "build" / build_type.lower()
+    if rebuild and build_dir.exists():
+        shutil.rmtree(build_dir)
+    build_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
         cmake_exe,
         "-G", generator,
-        "-B", str(BUILD_DIR),
+        "-B", str(build_dir),
         "-S", str(ROVER_ROOT),
     ]
     if not is_multi_config(generator):
@@ -57,7 +56,8 @@ def configure(cmake_exe, build_type, generator, rebuild):
 
 
 def build(cmake_exe, build_type, generator, target):
-    cmd = [cmake_exe, "--build", str(BUILD_DIR)]
+    build_dir = ROVER_ROOT / "build" / build_type.lower()
+    cmd = [cmake_exe, "--build", str(build_dir)]
 
     if is_multi_config(generator):
         cmd.extend(["--config", build_type])
@@ -77,7 +77,7 @@ def main():
     parser = argparse.ArgumentParser(description="RoverEngine build")
     parser.add_argument(
         "-t", "--type", default="Debug",
-        choices=["Debug", "Release", "RelWithDebInfo", "MinSizeRel"],
+        choices=["Debug", "Release"],
         help="Build type (default: Debug)")
     parser.add_argument(
         "-r", "--rebuild", action="store_true",
