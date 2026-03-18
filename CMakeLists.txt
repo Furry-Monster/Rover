@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 project(RoverEngine
         VERSION 0.1.0
@@ -37,20 +37,6 @@ configure_file(
         "${CMAKE_BINARY_DIR}/generated/rover_version.h"
         @ONLY
 )
-
-set(_rover_resource_dirs "")
-if (EXISTS "${ROVER_ROOT_DIR}/assets")
-    list(APPEND _rover_resource_dirs "${ROVER_ROOT_DIR}/assets")
-endif ()
-if (EXISTS "${ROVER_ROOT_DIR}/shaders")
-    list(APPEND _rover_resource_dirs "${ROVER_ROOT_DIR}/shaders")
-endif ()
-if (_rover_resource_dirs)
-    rover_copy_resources(rover_copy_resources
-            DIRECTORIES ${_rover_resource_dirs}
-            DESTINATION "${ROVER_BIN_DIR}"
-    )
-endif ()
 
 if (EXISTS "${ROVER_ROOT_DIR}/core/CMakeLists.txt")
     add_subdirectory(core)

@@ -1,18 +1,3 @@
-function(rover_copy_resources _target)
-    cmake_parse_arguments(ARG "" "DESTINATION" "DIRECTORIES" ${ARGN})
-    if(NOT ARG_DIRECTORIES OR NOT ARG_DESTINATION)
-        return()
-    endif()
-    set(_cmds)
-    foreach(_dir IN LISTS ARG_DIRECTORIES)
-        get_filename_component(_name "${_dir}" NAME)
-        list(APPEND _cmds
-            COMMAND "${CMAKE_COMMAND}" -E copy_directory "${_dir}" "${ARG_DESTINATION}/${_name}"
-        )
-    endforeach()
-    add_custom_target(${_target} ${_cmds} COMMENT "Copying resources to ${ARG_DESTINATION}")
-endfunction()
-
 function(rover_target_common_setup _target)
     cmake_parse_arguments(ARG "" "FOLDER" "" ${ARGN})
     target_link_libraries(${_target} PRIVATE Rover::CompilerOptions Rover::SanitizerOptions)
