@@ -1,0 +1,6 @@
+---
+Checks: >-
+  modernize-use-nullptr,
+  modernize-use-bool-literals,
+  readability-simplify-boolean-expr
+WarningsAsErrors: ''
