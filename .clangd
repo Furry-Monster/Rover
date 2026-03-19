@@ -1,9 +1,15 @@
+# https://clangd.llvm.org/config
 ---
 CompileFlags:
   CompilationDatabase: .
   Add:
     - -Wall
     - -Wextra
+    - -x
+    - c++
+    - -std=c++17
+    # Some thirdparty includes seem to require a high -ferror-limit to pass checks.
+    - -ferror-limit=100
 
 Diagnostics:
   ClangTidy:
@@ -11,9 +17,13 @@ Diagnostics:
   MissingIncludes: Strict
   UnusedIncludes: Strict
 ---
+# Header-specific conditions.
+
 If:
   PathMatch: .*\.(h|hh|hpp|hxx|inc)
 
+# Exclude certain, noisy warnings that lack full context. Replace with lowered severity if/when
+# clangd gets diagnostic severity support. (See: https://github.com/clangd/clangd/issues/1937)
 CompileFlags:
   Add:
     - -Wno-unneeded-internal-declaration

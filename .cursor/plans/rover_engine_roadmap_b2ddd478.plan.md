@@ -4,7 +4,7 @@ overview: 为 Rover 游戏引擎制定从零到完整的分阶段开发路线图
 todos:
   - id: phase0-typedefs
     content: "Phase 0.1: core/typedefs.h, memory utilities, StringName"
-    status: pending
+    status: completed
   - id: phase0-object
     content: "Phase 0.2: Object base class + ClassDB reflection system"
     status: pending

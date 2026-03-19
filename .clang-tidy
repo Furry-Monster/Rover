@@ -25,7 +25,7 @@ Checks:
   - performance-move-const-arg
 HeaderFileExtensions: ["", h, hh, hpp, hxx, inc]
 ImplementationFileExtensions: [c, cc, cpp, cxx]
-HeaderFilterRegex: (core|main|platform|scene|servers)/
+HeaderFilterRegex: (core|main|platform|scene|servers|tests)/
 FormatStyle: file
 CheckOptions:
   cppcoreguidelines-pro-type-member-init.IgnoreArrays: true
