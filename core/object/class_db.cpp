@@ -116,3 +116,36 @@ ClassDB::get_parent_class(const StringName& p_class)
     }
     return ci->parent_name;
 }
+
+// ---------------------------------------------------------------------------
+// Signal registration
+// ---------------------------------------------------------------------------
+
+void
+ClassDB::add_signal(const StringName& p_class, const StringName& p_signal)
+{
+    ClassInfo* ci = _get_class_info(p_class);
+    if (!ci)
+    {
+        return;
+    }
+    ci->signal_list.push_back(p_signal);
+}
+
+bool
+ClassDB::has_signal(const StringName& p_class, const StringName& p_signal)
+{
+    ClassInfo* ci = _get_class_info(p_class);
+    while (ci)
+    {
+        for (const auto& s : ci->signal_list)
+        {
+            if (s == p_signal)
+            {
+                return true;
+            }
+        }
+        ci = ci->inherits_ptr;
+    }
+    return false;
+}

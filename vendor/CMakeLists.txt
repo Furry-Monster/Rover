@@ -116,6 +116,9 @@ add_subdirectory("${ROVER_VENDOR_ROOT}/spdlog")
 
 list(APPEND ROVER_VENDOR_LIBS spdlog)
 
+# Core's Logger module needs spdlog headers + linkage.
+target_link_libraries(rover_core_impl PUBLIC spdlog)
+
 # ---------------------------------------------------------------------------
 # EnTT  (header-only — manual INTERFACE target)
 # ---------------------------------------------------------------------------

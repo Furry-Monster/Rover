@@ -1,10 +1,15 @@
 #pragma once
 
+#include "core/error/error_list.h"
+#include "core/object/callable.h"
 #include "core/string/string_name.h"
 
 #include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 class ClassDB;
+class Variant;
 
 /**
  * @brief
@@ -83,6 +88,22 @@ public:
 
     static void _bind_methods() {}
 
+    // -- Signals ------------------------------------------------------------
+
+    Error connect(const StringName& p_signal, const Callable& p_callable);
+    Error connect(const StringName& p_signal, Object* p_target, const StringName& p_method);
+    void  disconnect(const StringName& p_signal, Object* p_target, const StringName& p_method);
+    bool  is_connected(const StringName& p_signal, Object* p_target, const StringName& p_method) const;
+
+    template <typename... Args>
+    void emit_signal(const StringName& p_signal, Args&&... args);
+
+    void emit_signal_argv(const StringName& p_signal, const Variant* p_args, int p_arg_count);
+
+    // -- Virtual method call (used by Callable for Object+method) -----------
+
+    virtual Variant call(const StringName& p_method, const Variant* p_args, int p_arg_count);
+
     // -- Lifecycle ----------------------------------------------------------
 
     Object();
@@ -112,8 +133,37 @@ private:
     uint64_t        _instance_id = 0;
     static uint64_t _next_instance_id;
 
+    struct SignalConnection
+    {
+        Callable callable;
+    };
+
+    std::unordered_map<StringName, std::vector<SignalConnection>> _signal_map;
+
     friend class ClassDB;
 };
+
+// ---------------------------------------------------------------------------
+// Variadic emit_signal — defined here so Variant is visible via callable.h
+// (Variant only needs forward-decl in the class body above.)
+// ---------------------------------------------------------------------------
+// Include variant.h so the template body can construct Variant from Args.
+#include "core/variant/variant.h"
+
+template <typename... Args>
+void
+Object::emit_signal(const StringName& p_signal, Args&&... args)
+{
+    if constexpr (sizeof...(Args) == 0)
+    {
+        emit_signal_argv(p_signal, nullptr, 0);
+    }
+    else
+    {
+        Variant argv[] = {Variant(std::forward<Args>(args))...};
+        emit_signal_argv(p_signal, argv, static_cast<int>(sizeof...(Args)));
+    }
+}
 
 // ---------------------------------------------------------------------------
 // ROVER_CLASS(m_class, m_parent)

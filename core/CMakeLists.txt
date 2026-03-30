@@ -14,10 +14,14 @@ target_link_libraries(rover_core INTERFACE
 
 add_library(rover_core_impl STATIC
     error/error_list.cpp
+    event/event_bus.cpp
+    log/logger.cpp
+    object/callable.cpp
     object/class_db.cpp
     object/object.cpp
     os/memory.cpp
     string/string_name.cpp
+    variant/variant.cpp
 )
 target_link_libraries(rover_core_impl PUBLIC rover_core)
 target_link_libraries(rover_core INTERFACE rover_core_impl)

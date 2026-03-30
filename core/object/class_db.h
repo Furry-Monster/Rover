@@ -6,6 +6,7 @@
 #include <memory>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 class Object;
 
@@ -30,6 +31,8 @@ public:
 
         Object* (*creation_func)() = nullptr;
         bool exposed               = false;
+
+        std::vector<StringName> signal_list;
     };
 
     // -- Registration -------------------------------------------------------
@@ -61,6 +64,11 @@ public:
     static bool       is_parent_class(const StringName& p_child, const StringName& p_parent);
     static StringName get_parent_class(const StringName& p_class);
     static ClassInfo* get_class_info(const StringName& p_class);
+
+    // -- Signal registration (called from _bind_methods) ---------------------
+
+    static void add_signal(const StringName& p_class, const StringName& p_signal);
+    static bool has_signal(const StringName& p_class, const StringName& p_signal);
 
     // -- Internal (called by ROVER_CLASS / Object::initialize_class) --------
 
