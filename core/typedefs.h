@@ -1,12 +1,7 @@
 #pragma once
 
-#include "core/error/error_list.h"
-
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
-#include <type_traits>
-#include <utility>
 
 static_assert(__cplusplus >= 201703L, "C++17 required.");
 

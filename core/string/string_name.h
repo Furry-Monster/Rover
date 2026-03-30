@@ -4,8 +4,13 @@
 #include <cstdint>
 #include <string>
 
-// Interned string — equality and hash are O(1) via pointer identity.
-// Empty StringName (default-constructed) compares equal to other empty StringNames.
+/**
+ * @brief
+ *
+ * Interned string — equality and hash are O(1) via pointer identity.
+ * Empty StringName (default-constructed) compares equal to other empty StringNames.
+ *
+ */
 class StringName
 {
     struct Data
@@ -15,6 +20,7 @@ class StringName
         std::string           str;
     };
 
+    // Note:
     // Table is forward-declared; defined in string_name.cpp to avoid
     // pulling <mutex>/<unordered_map> into every translation unit.
     struct Table;

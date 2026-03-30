@@ -63,6 +63,7 @@ StringName::unref(Data* d) noexcept
     {
         return;
     }
+
     if (d->refcount.fetch_sub(1, std::memory_order_acq_rel) == 1)
     {
         auto&                       t = get_table();

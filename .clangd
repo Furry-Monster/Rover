@@ -14,8 +14,8 @@ CompileFlags:
 Diagnostics:
   ClangTidy:
     FastCheckFilter: None
-  MissingIncludes: Strict
-  UnusedIncludes: Strict
+  MissingIncludes: None
+  UnusedIncludes: None
 ---
 # Header-specific conditions.
 
