@@ -18,10 +18,12 @@ enum ObjectNotification
     NOTIFICATION_PREDELETE      = 1,
 };
 
-// ---------------------------------------------------------------------------
-// Object — root of all engine types that need RTTI, notifications, and
-// ClassDB registration.
-// ---------------------------------------------------------------------------
+/**
+ * @brief
+ *
+ * Object — root of all engine types that need RTTI, notifications, and
+ * ClassDB registration.
+ */
 class Object
 {
 public:
@@ -90,6 +92,7 @@ public:
     Object& operator=(const Object&) = delete;
 
 protected:
+    // Note:
     // Subclasses define their own non-virtual _notification(int) to handle
     // notifications.  The ROVER_CLASS dispatch chain detects overrides via
     // member-function-pointer comparison and calls each level exactly once.

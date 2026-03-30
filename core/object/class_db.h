@@ -9,13 +9,15 @@
 
 class Object;
 
-// ---------------------------------------------------------------------------
-// ClassDB — global registry of all Object-derived classes.
-//
-// Every class that uses ROVER_CLASS is registered here during
-// initialize_class().  register_class<T>() additionally installs a
-// creation function so that instances can be created by name at runtime.
-// ---------------------------------------------------------------------------
+/**
+ * @brief
+ *
+ * ClassDB — global registry of all Object-derived classes.
+ *
+ * Every class that uses ROVER_CLASS is registered here during
+ * initialize_class().  register_class<T>() additionally installs a
+ * creation function so that instances can be created by name at runtime.
+ */
 class ClassDB
 {
 public:
@@ -33,16 +35,16 @@ public:
     // -- Registration -------------------------------------------------------
 
     template <typename T>
-    static void
-    register_class()
+    static void register_class()
     {
-        static_assert(std::is_same_v<typename T::self_type, T>,
-                      "Class not declared properly. Use ROVER_CLASS.");
+        static_assert(std::is_same_v<typename T::self_type, T>, "Class not declared properly. Use ROVER_CLASS.");
         T::initialize_class();
 
         ClassInfo* ci = _get_class_info(T::get_class_static());
         if (!ci)
+        {
             return;
+        }
 
         ci->creation_func = &_creator<T>;
         ci->exposed       = true;
@@ -62,19 +64,15 @@ public:
 
     // -- Internal (called by ROVER_CLASS / Object::initialize_class) --------
 
-    static void _add_class(
-        const StringName& p_name,
-        const StringName& p_parent,
-        void*             p_class_ptr);
+    static void _add_class(const StringName& p_name, const StringName& p_parent, void* p_class_ptr);
 
 private:
     template <typename T>
-    static Object*
-    _creator()
+    static Object* _creator()
     {
         return memnew<T>();
     }
 
-    static ClassInfo*                                              _get_class_info(const StringName& p_class);
+    static ClassInfo*                                                  _get_class_info(const StringName& p_class);
     static std::unordered_map<StringName, std::unique_ptr<ClassInfo>>& _get_class_map();
 };
