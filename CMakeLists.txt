@@ -69,4 +69,8 @@ add_subdirectory(scene)
 add_subdirectory(platform)
 add_subdirectory(servers)
 add_subdirectory(main)
+
+if (ROVER_BUILD_TESTS)
+    enable_testing()
+endif ()
 add_subdirectory(tests)
