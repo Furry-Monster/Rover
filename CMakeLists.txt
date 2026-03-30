@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 project(RoverEngine
         VERSION 0.1.0
         LANGUAGES CXX C
-        DESCRIPTION "Vulkan + SDL3 game engine for Windows and Linux"
+        DESCRIPTION "Rover Game Engine"
 )
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/misc/cmake")
@@ -38,9 +38,12 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}/lib")
 foreach (_config Debug Release)
     string(TOUPPER ${_config} _config_upper)
     string(TOLOWER ${_config} _config_lower)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_config_upper} "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_config_upper}
+        "${ROVER_ROOT_DIR}/bin/${_config_lower}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_config_upper}
+        "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_config_upper}
+        "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
 endforeach ()
 
 configure_file(

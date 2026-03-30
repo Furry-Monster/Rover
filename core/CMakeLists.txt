@@ -14,7 +14,7 @@ target_link_libraries(rover_core INTERFACE
 
 add_library(rover_core_impl STATIC
     error/error_list.cpp
-    memory/memory.cpp
+    os/memory.cpp
     string/string_name.cpp
 )
 target_link_libraries(rover_core_impl PUBLIC rover_core)
