@@ -1,7 +1,0 @@
-function(rover_target_common_setup _target)
-    cmake_parse_arguments(ARG "" "FOLDER" "" ${ARGN})
-    target_link_libraries(${_target} PRIVATE Rover::CompilerOptions Rover::SanitizerOptions)
-    if(ARG_FOLDER)
-        set_target_properties(${_target} PROPERTIES FOLDER "${ARG_FOLDER}")
-    endif()
-endfunction()

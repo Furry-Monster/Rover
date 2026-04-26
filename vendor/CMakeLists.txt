@@ -116,9 +116,6 @@ add_subdirectory("${ROVER_VENDOR_ROOT}/spdlog")
 
 list(APPEND ROVER_VENDOR_LIBS spdlog)
 
-# Core's Logger module needs spdlog headers + linkage.
-target_link_libraries(rover_core_impl PUBLIC spdlog)
-
 # ---------------------------------------------------------------------------
 # EnTT  (header-only — manual INTERFACE target)
 # ---------------------------------------------------------------------------
@@ -151,6 +148,6 @@ list(APPEND ROVER_VENDOR_LIBS rover_platform_libs)
 # ---------------------------------------------------------------------------
 add_library(rover_vendor INTERFACE)
 add_library(Rover::Vendor ALIAS rover_vendor)
-target_link_libraries(rover_vendor INTERFACE Rover::Core ${ROVER_VENDOR_LIBS})
+target_link_libraries(rover_vendor INTERFACE ${ROVER_VENDOR_LIBS})
 
 set_target_properties(rover_vendor PROPERTIES FOLDER "Vendor")
