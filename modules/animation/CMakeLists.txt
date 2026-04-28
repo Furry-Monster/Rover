@@ -1,0 +1,11 @@
+message(STATUS "[Rover] Configuring modules/animation...")
+
+rover_glob_sources(_animation_sources "${CMAKE_CURRENT_SOURCE_DIR}")
+
+rover_add_library(rover_module_animation
+    SOURCES ${_animation_sources}
+    PUBLIC_DEPS
+        Rover::Core
+        Rover::Services
+    FOLDER "Rover/Modules"
+)

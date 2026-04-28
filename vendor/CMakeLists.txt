@@ -1,9 +1,12 @@
 message(STATUS "[Rover] Configuring vendor...")
 
+# Each engine layer links the specific vendor targets it needs (SDL3, glm,
+# spdlog, etc.). There is no Rover::Vendor aggregate -- consumers should
+# request only what they depend on so transitive includes stay tight.
+
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 set(ROVER_VENDOR_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
-set(ROVER_VENDOR_LIBS "")
 
 # ---------------------------------------------------------------------------
 # SDL3
@@ -15,8 +18,6 @@ set(SDL_INSTALL      OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${ROVER_VENDOR_ROOT}/SDL" EXCLUDE_FROM_ALL)
 
-list(APPEND ROVER_VENDOR_LIBS SDL3::SDL3)
-
 # ---------------------------------------------------------------------------
 # glm  (header-only)
 # ---------------------------------------------------------------------------
@@ -27,8 +28,6 @@ target_compile_definitions(glm INTERFACE
     GLM_FORCE_DEPTH_ZERO_TO_ONE  # Vulkan clip space: depth [0, 1]
     GLM_FORCE_RADIANS
 )
-
-list(APPEND ROVER_VENDOR_LIBS glm)
 
 # ---------------------------------------------------------------------------
 # Vulkan SDK  (system install, located via FindVulkan)
@@ -82,8 +81,6 @@ target_compile_definitions(rover_vulkan INTERFACE
     VMA_DYNAMIC_VULKAN_FUNCTIONS=1
 )
 
-list(APPEND ROVER_VENDOR_LIBS rover_vulkan)
-
 # ---------------------------------------------------------------------------
 # Dear ImGui  (SDL3 + Vulkan backends)
 # ---------------------------------------------------------------------------
@@ -102,8 +99,6 @@ target_include_directories(imgui SYSTEM PUBLIC "${IMGUI_DIR}" "${IMGUI_DIR}/back
 target_link_libraries(imgui PUBLIC SDL3::SDL3 Rover::Vulkan)
 target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 
-list(APPEND ROVER_VENDOR_LIBS imgui)
-
 # ---------------------------------------------------------------------------
 # spdlog
 # ---------------------------------------------------------------------------
@@ -114,15 +109,11 @@ set(SPDLOG_INSTALL       OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${ROVER_VENDOR_ROOT}/spdlog")
 
-list(APPEND ROVER_VENDOR_LIBS spdlog)
-
 # ---------------------------------------------------------------------------
 # EnTT  (header-only — manual INTERFACE target)
 # ---------------------------------------------------------------------------
 add_library(entt INTERFACE)
 target_include_directories(entt SYSTEM INTERFACE "${ROVER_VENDOR_ROOT}/entt/src")
-
-list(APPEND ROVER_VENDOR_LIBS entt)
 
 # ---------------------------------------------------------------------------
 # doctest
@@ -141,13 +132,3 @@ if (UNIX AND NOT APPLE)
 elseif (WIN32)
     target_link_libraries(rover_platform_libs INTERFACE user32 ws2_32)
 endif ()
-list(APPEND ROVER_VENDOR_LIBS rover_platform_libs)
-
-# ---------------------------------------------------------------------------
-# Aggregate target — link Rover::Vendor to get everything
-# ---------------------------------------------------------------------------
-add_library(rover_vendor INTERFACE)
-add_library(Rover::Vendor ALIAS rover_vendor)
-target_link_libraries(rover_vendor INTERFACE ${ROVER_VENDOR_LIBS})
-
-set_target_properties(rover_vendor PROPERTIES FOLDER "Vendor")
