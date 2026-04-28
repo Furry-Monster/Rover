@@ -16,7 +16,7 @@
 #include "editor/register_editor_types.h"
 #endif
 
-#include <cstdio>
+#include "core/log/log.h"
 
 namespace rover {
 
@@ -27,9 +27,9 @@ static int run_main_loop() {
 }
 
 static int rover_main(int /*argc*/, char** /*argv*/) {
-    std::printf("[Rover] %s %s\n", ROVER_VERSION_NAME, ROVER_VERSION_STRING);
-
     register_core_types();
+
+    ROVER_LOG_INFO("{} {}", ROVER_VERSION_NAME, ROVER_VERSION_STRING);
     register_service_types();
     register_driver_types();
     register_platform_apis();
