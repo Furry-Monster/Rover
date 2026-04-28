@@ -417,7 +417,7 @@ def validation_env() -> dict[str, str]
    ALL_COMMANDS = [..., my_new_command, ...]
    ```
 
-3. **更新本文档（`docs/MISC.md`）的 [子命令参考](#5-子命令参考)** 一节
+3. **更新本文档（`docs/dev/MISC.md`）的 [子命令参考](#5-子命令参考)** 一节
 
 4. **测试**：`./misc/scripts/rover-cli <name> --help`
 

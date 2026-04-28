@@ -12,7 +12,7 @@ them generically:
 Adding a new subcommand:
   1. Create rover/commands/<name>.py with the four interface members.
   2. Append it to ``ALL_COMMANDS`` in this file.
-  3. Document it in ``docs/MISC.md``.
+  3. Document it in ``docs/dev/MISC.md``.
 """
 
 from __future__ import annotations
