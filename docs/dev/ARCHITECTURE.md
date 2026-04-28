@@ -222,20 +222,20 @@ graph LR
 
 | Target | 别名 | 类型 | 所在文件 |
 |---|---|---|---|
-| `rover_core` | `Rover::Core` | STATIC | [core/CMakeLists.txt](../core/CMakeLists.txt) |
-| `rover_driver_vulkan` | — | STATIC | [drivers/vulkan/CMakeLists.txt](../drivers/vulkan/CMakeLists.txt) |
-| `rover_drivers` | `Rover::Drivers` | STATIC | [drivers/CMakeLists.txt](../drivers/CMakeLists.txt) |
+| `rover_core` | `Rover::Core` | STATIC | [core/CMakeLists.txt](../../core/CMakeLists.txt) |
+| `rover_driver_vulkan` | — | STATIC | [drivers/vulkan/CMakeLists.txt](../../drivers/vulkan/CMakeLists.txt) |
+| `rover_drivers` | `Rover::Drivers` | STATIC | [drivers/CMakeLists.txt](../../drivers/CMakeLists.txt) |
 | `rover_platform_<os>` | — | STATIC | `platform/<os>/CMakeLists.txt` |
-| `rover_platform` | `Rover::Platform` | STATIC | [platform/CMakeLists.txt](../platform/CMakeLists.txt) |
-| `rover_services` | `Rover::Services` | STATIC | [services/CMakeLists.txt](../services/CMakeLists.txt) |
+| `rover_platform` | `Rover::Platform` | STATIC | [platform/CMakeLists.txt](../../platform/CMakeLists.txt) |
+| `rover_services` | `Rover::Services` | STATIC | [services/CMakeLists.txt](../../services/CMakeLists.txt) |
 | `rover_module_<name>` | — | STATIC | `modules/<name>/CMakeLists.txt` |
-| `rover_modules` | `Rover::Modules` | STATIC | [modules/CMakeLists.txt](../modules/CMakeLists.txt) |
-| `rover_editor_gui` | — | STATIC | [editor/gui/CMakeLists.txt](../editor/gui/CMakeLists.txt) |
-| `rover_editor_cli` | — | STATIC | [editor/cli/CMakeLists.txt](../editor/cli/CMakeLists.txt) |
-| `rover_editor` | `Rover::Editor` | STATIC | [editor/CMakeLists.txt](../editor/CMakeLists.txt) |
-| `rover` | — | EXECUTABLE | [main/CMakeLists.txt](../main/CMakeLists.txt) |
-| `rover_tests` | — | EXECUTABLE | [tests/CMakeLists.txt](../tests/CMakeLists.txt) |
-| `rover_compile_flags` | `Rover::CompileFlags` | INTERFACE | [misc/cmake/RoverCompiler.cmake](../misc/cmake/RoverCompiler.cmake) |
+| `rover_modules` | `Rover::Modules` | STATIC | [modules/CMakeLists.txt](../../modules/CMakeLists.txt) |
+| `rover_editor_gui` | — | STATIC | [editor/gui/CMakeLists.txt](../../editor/gui/CMakeLists.txt) |
+| `rover_editor_cli` | — | STATIC | [editor/cli/CMakeLists.txt](../../editor/cli/CMakeLists.txt) |
+| `rover_editor` | `Rover::Editor` | STATIC | [editor/CMakeLists.txt](../../editor/CMakeLists.txt) |
+| `rover` | — | EXECUTABLE | [main/CMakeLists.txt](../../main/CMakeLists.txt) |
+| `rover_tests` | — | EXECUTABLE | [tests/CMakeLists.txt](../../tests/CMakeLists.txt) |
+| `rover_compile_flags` | `Rover::CompileFlags` | INTERFACE | [misc/cmake/RoverCompiler.cmake](../../misc/cmake/RoverCompiler.cmake) |
 
 > **Façade 模式**：`Rover::Drivers`、`Rover::Platform`、`Rover::Modules`、`Rover::Editor` 四个聚合 target 仅是为 `main/` 提供稳定的链接名，实际工作由其下属具体 target 完成。
 
@@ -295,7 +295,7 @@ void unregister_module_types() {
 
 ## 6. 初始化与关闭顺序
 
-[main/main.cpp](../main/main.cpp) 中的标准启动顺序：
+[main/main.cpp](../../main/main.cpp) 中的标准启动顺序：
 
 ```
 1. register_core_types()        类型系统、数学、分配器
@@ -365,7 +365,7 @@ void unregister_module_types() {
 
 ## 9. CMake 配置选项
 
-定义于 [misc/cmake/RoverOptions.cmake](../misc/cmake/RoverOptions.cmake)：
+定义于 [misc/cmake/RoverOptions.cmake](../../misc/cmake/RoverOptions.cmake)：
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
@@ -433,34 +433,34 @@ compile_commands.json          自动同步到仓库根（供 clangd 用）
        FOLDER "Rover/Modules"
    )
    ```
-5. 在 [misc/cmake/RoverOptions.cmake](../misc/cmake/RoverOptions.cmake) 添加 `option(ROVER_MODULE_<NAME> "..." ON)`
+5. 在 [misc/cmake/RoverOptions.cmake](../../misc/cmake/RoverOptions.cmake) 添加 `option(ROVER_MODULE_<NAME> "..." ON)`
 6. 重新 `cmake -B build/debug`，自动生成的 `register_module_types.gen.cpp` 会调用新模块
 
 ### 10.2 新增一个驱动
 
 1. 创建 `drivers/<name>/{CMakeLists.txt, register_types.h, register_types.cpp}`
 2. 在 `drivers/<name>/CMakeLists.txt` 中 `target_compile_definitions(rover_driver_<name> PUBLIC ROVER_DRIVER_<NAME>=1)`
-3. 在 [drivers/CMakeLists.txt](../drivers/CMakeLists.txt) 加入条件分支：
+3. 在 [drivers/CMakeLists.txt](../../drivers/CMakeLists.txt) 加入条件分支：
    ```cmake
    if (ROVER_<NAME> AND <平台/条件>)
        add_subdirectory(<name>)
        list(APPEND ROVER_ENABLED_DRIVERS rover_driver_<name>)
    endif ()
    ```
-4. 在 [drivers/register_driver_types.cpp](../drivers/register_driver_types.cpp) 加 `#ifdef ROVER_DRIVER_<NAME>` 调用入口
+4. 在 [drivers/register_driver_types.cpp](../../drivers/register_driver_types.cpp) 加 `#ifdef ROVER_DRIVER_<NAME>` 调用入口
 
 ### 10.3 新增一个平台
 
 1. 创建 `platform/<os>/{CMakeLists.txt, register_types.h, register_types.cpp}`
-2. 在 [misc/cmake/RoverOptions.cmake](../misc/cmake/RoverOptions.cmake) 的 `set_property(... STRINGS ...)` 中加入 `<os>`
-3. 在 [misc/cmake/RoverCompiler.cmake](../misc/cmake/RoverCompiler.cmake) 中为新 `ROVER_PLATFORM` 分支加宏定义
-4. 在 [platform/register_platform_apis.cpp](../platform/register_platform_apis.cpp) 加 `#elif defined(ROVER_PLATFORM_<OS>)` 分支
+2. 在 [misc/cmake/RoverOptions.cmake](../../misc/cmake/RoverOptions.cmake) 的 `set_property(... STRINGS ...)` 中加入 `<os>`
+3. 在 [misc/cmake/RoverCompiler.cmake](../../misc/cmake/RoverCompiler.cmake) 中为新 `ROVER_PLATFORM` 分支加宏定义
+4. 在 [platform/register_platform_apis.cpp](../../platform/register_platform_apis.cpp) 加 `#elif defined(ROVER_PLATFORM_<OS>)` 分支
 
 ### 10.4 新增一个服务
 
 1. 在 `services/<name>/` 下放抽象接口 + 单例实现
 2. 抽象接口（如 `IGraphicsDevice`）应放在 `core/graphics/`，由 driver 实现
-3. 在 [services/register_service_types.cpp](../services/register_service_types.cpp) 中创建并注册单例
+3. 在 [services/register_service_types.cpp](../../services/register_service_types.cpp) 中创建并注册单例
 4. **不需要**新建 CMake target；`services/CMakeLists.txt` 已经 glob 整个目录
 
 ### 10.5 第一次构建
@@ -478,7 +478,7 @@ ctest --test-dir build/debug       # 同上，CTest 形式
 ## 11. 测试
 
 - 框架：[doctest](https://github.com/doctest/doctest)（vendor 中）
-- 入口：[tests/main.cpp](../tests/main.cpp) 仅含 `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN`
+- 入口：[tests/main.cpp](../../tests/main.cpp) 仅含 `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN`
 - 测试文件：放在 `tests/` 任意子目录，文件名建议 `<area>_<topic>_test.cpp`
 - 自动收集：`rover_glob_sources()` 会包含全部 cpp 文件
 - 链接：测试可访问 `Rover::Core` / `Rover::Services` / `Rover::Modules`
@@ -501,38 +501,20 @@ TEST_CASE("Vector3 dot product") {
 
 ## 12. 关键设计决策（FAQ）
 
-### 为什么 core 在 Layer 1，drivers 在 Layer 2？
+> 历史 FAQ 已沉淀为独立的 ADR。完整决策记录见 [`docs/product/adr/INDEX.md`](../product/adr/INDEX.md)。
 
-依赖倒置原则。`core` 只声明抽象（pure virtual class），`drivers` 实现这些抽象。`services` 调用抽象，所以可以在不知道具体后端的情况下编译通过。`main/` 在最后做装配。这样替换或增加后端不会污染上层代码。
+| 关注点 | ADR |
+|--------|-----|
+| 为什么 core 在 Layer 1，drivers 在 Layer 2？ | [ADR-0001](../product/adr/ADR-0001-three-layer-architecture.md) |
+| 为什么不用 SCons / Bazel / Bee？ | [ADR-0002](../product/adr/ADR-0002-cmake-as-single-build-system.md) |
+| 为什么把 scene 放进 modules？ | [ADR-0003](../product/adr/ADR-0003-modules-over-fixed-scene-tree.md) |
+| 为什么用 `services` 而不是 `servers`？ | [ADR-0004](../product/adr/ADR-0004-services-vs-servers-naming.md) |
+| 为什么 cli 在 editor 下？ | [ADR-0005](../product/adr/ADR-0005-cli-under-editor.md) |
+| 为什么没有 `core/io/`？ | [ADR-0006](../product/adr/ADR-0006-io-split-platform-and-serialization.md) |
 
-### 为什么用 `services` 而不是 Godot 的 `servers`？
+补充澄清（不单独成 ADR）：
 
-`services` 在英文里更精确地表达了 **服务对外提供能力** 的语义（service-oriented architecture），而 `server` 在游戏引擎语境里容易和网络服务器混淆。
-
-### 为什么把 scene 放进 modules？
-
-Godot 把 `scene/` 作为独立顶级目录是历史包袱（`Node` 体系紧耦合在引擎核心）。Rover 倾向于 ECS，scene 只是 EnTT 世界的一个使用方式。允许其他模块（例如 `voxel/`、`procedural/`）以完全不同的方式组织世界。
-
-### 为什么 cli 在 editor 下？
-
-`editor/cli/` 不是 "运行时 CLI"（那部分在 `main/` 里处理 argv）。它是 **编辑器命令行接口**，提供给 AI Agent 和构建脚本调用编辑器功能（导入资源、批量构建、运行测试场景）。它和 `editor/gui/` 共享项目管理、Asset Pipeline 等基础设施，所以放在一起。
-
-### 为什么不用 SCons / Bazel / Bee？
-
-Godot 用 SCons 是历史选择；Unity 用 Bee 是因为它有大量 C# 代码。Rover 是纯 C++ 工程，CMake + Ninja 提供：clangd / IDE 原生支持、preset、CTest 集成、跨平台一致性。统一构建系统降低 onboarding 成本。
-
-### 为什么没有 `core/io/` 但有 `modules/serialization/`？
-
-把 IO 拆成两层：
-
-- **底层文件 / VFS** —— 平台相关，应放 `platform/<os>/file.cpp` 与 `core/os/`
-- **资源序列化 / 反射格式** —— 业务相关，作为可替换模块 `modules/serialization/`
-
-Godot 把这两者混在 `core/io/` 里，难以单独替换序列化格式。Rover 分清职责。
-
-### Editor 不该用 services 吗？
-
-Editor 必须能驱动整个引擎（包括运行时服务）才能做 Play-In-Editor。所以 `editor/` 依赖 `services/` 与 `modules/` 是合理的；这正是 Layer 5 的定义。
+- **Editor 依赖 services 与 modules** 是 Layer 5 的定义。Editor 必须能驱动整个引擎才能做 Play-In-Editor，所以这种「跨层」依赖是合理的，不违反分层原则。
 
 ---
 
@@ -566,10 +548,16 @@ Editor 必须能驱动整个引擎（包括运行时服务）才能做 Play-In-E
 
 ### 子系统详细文档
 
-- [docs/CORE.md](CORE.md) — Layer 1 全部子系统的详细 API 与设计
-- [docs/PLATFORM.md](PLATFORM.md) — Linux 平台层与跨平台扩展
-- [docs/DRIVERS.md](DRIVERS.md) — Vulkan 驱动实现细节
-- [docs/MISC.md](MISC.md) — 工程工具（rover-cli + CMake 模块）
+- [docs/dev/CORE.md](CORE.md) — Layer 1 全部子系统的详细 API 与设计
+- [docs/dev/PLATFORM.md](PLATFORM.md) — Linux 平台层与跨平台扩展
+- [docs/dev/DRIVERS.md](DRIVERS.md) — Vulkan 驱动实现细节
+- [docs/dev/MISC.md](MISC.md) — 工程工具（rover-cli + CMake 模块）
+
+### 设计决策与规范
+
+- [docs/product/adr/INDEX.md](../product/adr/INDEX.md) — 架构决策记录（ADR）
+- [docs/product/ROADMAP.md](../product/ROADMAP.md) — 演进路线图与支持矩阵
+- [docs/standard/ARCHITECTURE_RULES.md](../standard/ARCHITECTURE_RULES.md) — 必须遵守的层依赖与 include 约束
 
 ---
 

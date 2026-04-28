@@ -3,7 +3,7 @@
 
 This is a thin shim that adds the script directory to ``sys.path`` so the
 ``rover`` package alongside it is importable, then dispatches to
-``rover.cli.main``. Run ``rover-cli --help`` for usage; see ``docs/MISC.md``
+``rover.cli.main``. Run ``rover-cli --help`` for usage; see ``docs/dev/MISC.md``
 for full documentation.
 
 A symlink ``rover`` next to this file is provided as a convenience
