@@ -553,6 +553,8 @@ Editor 必须能驱动整个引擎（包括运行时服务）才能做 Play-In-E
 - [x] **drivers/vulkan/**：实现 `GraphicsDeviceVulkan`，封装 volk + VMA
 - [x] **platform/linux/**：SDL3 窗口、surface 创建、事件泵、time source
 - [x] **里程碑**：在窗口中渲染彩色三角形 ✓（2026-04 完成）
+- [x] **tests/**：core 子系统单元测试（75 cases / 255 assertions），doctest 框架就绪
+- [x] **misc/scripts/**：`rover-cli` 工程化 Python 开发者 CLI（configure / build / clean / run / debug / test / format / shaders / status）
 
 ### Phase 2 及之后
 
@@ -560,13 +562,14 @@ Editor 必须能驱动整个引擎（包括运行时服务）才能做 Play-In-E
 - [ ] **modules/scene/**：EnTT World、`Entity`/`Component` 反射、场景树
 - [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser
 - [ ] **editor/cli/**：命令解析（建议用 `argparse` 风格），暴露 `import / export / build` 等
-- [ ] **tests/**：每个 core 子系统的单元测试，driver 的硬件无关 mock 测试
+- [ ] **tests/services & drivers/**：`GraphicsDevice` mock + `GraphicsService` 单元测试，集成测试穿过 driver 层
 
 ### 子系统详细文档
 
 - [docs/CORE.md](CORE.md) — Layer 1 全部子系统的详细 API 与设计
 - [docs/PLATFORM.md](PLATFORM.md) — Linux 平台层与跨平台扩展
 - [docs/DRIVERS.md](DRIVERS.md) — Vulkan 驱动实现细节
+- [docs/MISC.md](MISC.md) — 工程工具（rover-cli + CMake 模块）
 
 ---
 

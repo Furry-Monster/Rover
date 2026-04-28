@@ -1074,6 +1074,12 @@ ref_counted.h       ← 依赖 object.h
 - [x] `core/task/` — JobSystem（jthread + work-stealing）
 - [x] `core/object/` — Object、ClassDB、RefCounted、ROVER_CLASS 宏
 - [x] `core/graphics/` — GraphicsDevice 纯虚接口
+- [x] **测试**：`tests/core/{math,allocator,event,object,task}_test.cpp`，75 个测试用例 / 255 个断言全绿；通过 3 次故意 bug 注入验证测试有效性（Vector3 cross 反向、PoolAllocator 计数器漏减、JobSystem worker 跳过任务执行）
+
+### 已知限制
+
+- **`LinearAllocator` 对齐上限 = `alignof(std::max_align_t)`**：底层 `make_unique<u8[]>` 仅保证此对齐。请求更大对齐时不会触发崩溃，但首次分配可能落在比要求弱的边界上。需要更高对齐时应使用 `ArenaAllocator`（chunk 内部对齐由实现承担）或后续增强 `LinearAllocator` 让其 over-allocate 缓冲区。
+- **`JobSystem` 的 jobs-in-flight 计数器是计数语义**：当前在 `submit()` 增、worker 完成时减。若任务在 `submit()` 后但在 worker 拾取前出现计数错位，`wait_all()` 可能死循环（已用单元测试覆盖典型路径）。
 
 ### 待做
 
@@ -1085,6 +1091,7 @@ ref_counted.h       ← 依赖 object.h
 - [ ] `core/math/` — Basis（3×3 矩阵）、Plane、Ray、Frustum
 - [ ] `core/math/` — 噪声函数（Perlin/Simplex，程序化生成需要）
 - [ ] `core/allocator/` — StackAllocator（LIFO 模式）
+- [ ] `core/allocator/` — `LinearAllocator` 的 over-aligned 模式
 - [ ] `core/event/` — 线程安全版 Signal/EventBus
 - [ ] `core/task/` — TaskGraph（依赖图调度）
 - [ ] `core/graphics/` — Compute pipeline 支持
