@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Rover engine developer CLI launcher.
+
+This is a thin shim that adds the script directory to ``sys.path`` so the
+``rover`` package alongside it is importable, then dispatches to
+``rover.cli.main``. Run ``rover-cli --help`` for usage; see ``docs/MISC.md``
+for full documentation.
+
+A symlink ``rover`` next to this file is provided as a convenience
+shorthand; both invocations are equivalent.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if sys.version_info < (3, 10):
+    sys.stderr.write(
+        f"rover-cli requires Python 3.10+, got {sys.version_info.major}."
+        f"{sys.version_info.minor}\n"
+    )
+    sys.exit(1)
+
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE))
+
+from rover.cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -540,18 +540,33 @@ Editor 必须能驱动整个引擎（包括运行时服务）才能做 Play-In-E
 
 > 此章节随实现推进而更新。
 
-- [ ] **core/object/**：实现 `Object` 基类、`ClassDB`、信号 / 反射
-- [ ] **core/math/**：实现 `Vector{2,3,4}`、`Mat4`、`Quat`、`AABB`、`Transform3D`
-- [ ] **core/allocator/**：实现 `LinearAllocator`、`PoolAllocator`、`ArenaAllocator`
-- [ ] **core/task/**：基于 `std::jthread` + 工作窃取队列的 Job system
-- [ ] **core/graphics/graphics_device.h**：GraphicsDevice 抽象（缓冲、纹理、管线、命令）
-- [ ] **drivers/vulkan/**：实现 `GraphicsDeviceVulkan`，封装 volk + VMA
-- [ ] **platform/linux/**：SDL3 窗口、surface 创建、事件泵
+### Phase 1：引擎基础（让三角形亮起来）
+
+- [x] **core/object/**：实现 `Object` 基类、`ClassDB`、`RefCounted`、`ROVER_CLASS` 宏
+- [x] **core/math/**：实现 `Vector{2,3,4}`、`Mat4`、`Quat`、`AABB`、`Transform3D`
+- [x] **core/allocator/**：实现 `LinearAllocator`、`PoolAllocator`、`ArenaAllocator`
+- [x] **core/task/**：基于 `std::jthread` + 工作窃取队列的 Job system
+- [x] **core/event/**：`Delegate`、`Signal`、`EventBus`
+- [x] **core/log/**：spdlog 封装的双通道日志系统
+- [x] **core/graphics/graphics_device.h**：GraphicsDevice 抽象（缓冲、纹理、管线、命令）
+- [x] **core/graphics/window_system.h**：WindowSystem 抽象（platform↔driver 桥接）
+- [x] **drivers/vulkan/**：实现 `GraphicsDeviceVulkan`，封装 volk + VMA
+- [x] **platform/linux/**：SDL3 窗口、surface 创建、事件泵、time source
+- [x] **里程碑**：在窗口中渲染彩色三角形 ✓（2026-04 完成）
+
+### Phase 2 及之后
+
 - [ ] **services/graphics/**：`GraphicsService` 单例，Frame Graph
 - [ ] **modules/scene/**：EnTT World、`Entity`/`Component` 反射、场景树
 - [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser
 - [ ] **editor/cli/**：命令解析（建议用 `argparse` 风格），暴露 `import / export / build` 等
 - [ ] **tests/**：每个 core 子系统的单元测试，driver 的硬件无关 mock 测试
+
+### 子系统详细文档
+
+- [docs/CORE.md](CORE.md) — Layer 1 全部子系统的详细 API 与设计
+- [docs/PLATFORM.md](PLATFORM.md) — Linux 平台层与跨平台扩展
+- [docs/DRIVERS.md](DRIVERS.md) — Vulkan 驱动实现细节
 
 ---
 

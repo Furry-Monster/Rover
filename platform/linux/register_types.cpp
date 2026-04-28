@@ -1,14 +1,21 @@
 #include "platform/linux/register_types.h"
 
+#include "core/log/log.h"
+#include "platform/linux/linux_platform.h"
+
 namespace rover {
 
 void register_linux_platform() {
-    // TODO: initialize SDL subsystems, register Linux-specific OS services
-    // (filesystem, threading hooks, time source) with core.
+    if (!LinuxPlatform::get().init()) {
+        ROVER_LOG_FATAL("Failed to initialize Linux platform");
+        return;
+    }
+    ROVER_LOG_INFO("Linux platform initialized");
 }
 
 void unregister_linux_platform() {
-    // TODO: shutdown SDL and release Linux platform resources.
+    LinuxPlatform::get().shutdown();
+    ROVER_LOG_INFO("Linux platform shut down");
 }
 
 } // namespace rover

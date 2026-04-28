@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/graphics/graphics_desc.h"
+#include "core/graphics/window_system.h"
 
 namespace rover {
 
@@ -9,8 +10,8 @@ public:
     virtual ~GraphicsDevice() = default;
 
     // Lifecycle
-    virtual bool init()     = 0;
-    virtual void shutdown() = 0;
+    virtual bool init(WindowSystem& window) = 0;
+    virtual void shutdown()                 = 0;
 
     // ---- Resource creation / destruction ----
 
@@ -74,7 +75,14 @@ public:
 
     // ---- Swapchain ----
 
+    // Returns the texture handle for the swapchain image currently bound for
+    // rendering this frame (valid between begin_frame() and present()).
     virtual TextureHandle get_swapchain_texture() = 0;
+
+    // Enumeration helpers so callers can pre-create framebuffers per image.
+    virtual u32           get_swapchain_image_count()                 = 0;
+    virtual TextureHandle get_swapchain_texture_at(u32 image_index)   = 0;
+
     virtual Format        get_swapchain_format()  = 0;
     virtual u32           get_swapchain_width()   = 0;
     virtual u32           get_swapchain_height()  = 0;

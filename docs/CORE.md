@@ -97,10 +97,11 @@ core/
     ├── graphics_types.h                GPU 句柄类型、枚举、标志位
     ├── graphics_desc.h                 资源描述符结构体
     ├── graphics_device.h               GraphicsDevice 纯虚接口
+    ├── window_system.h                 WindowSystem 抽象（连接 platform 与 driver）
     └── graphics.h                      伞形头文件
 ```
 
-共 **44 个文件**（34 个 `.h` + 10 个 `.cpp`）。
+共 **45 个文件**（35 个 `.h` + 10 个 `.cpp`）。
 
 ---
 
@@ -819,7 +820,27 @@ ClassDB::register_class<RefCounted>();
 
 默认值已设置合理初始值（如 topology=TriangleList, cull=Back, depth_compare=Less）。
 
-### 10.5 GraphicsDevice — `graphics_device.h`
+### 10.5 WindowSystem — `window_system.h`
+
+桥接 `platform/` 层与 `drivers/` 层的抽象接口。`platform/<os>/` 实现这个接口（如 Linux 的 `Window` 类），`drivers/<api>/` 通过它创建后端 surface 与查询所需扩展。Vulkan 句柄通过不透明 `void*` 传递，避免 Vulkan 头文件污染 core。
+
+```cpp
+class WindowSystem {
+public:
+    virtual ~WindowSystem() = default;
+
+    // Vulkan 集成
+    virtual bool create_vulkan_surface(void* instance, void** surface_out) = 0;
+    virtual void get_vulkan_required_extensions(std::vector<const char*>& out) = 0;
+
+    // 窗口属性
+    [[nodiscard]] virtual u32  get_width()    const = 0;
+    [[nodiscard]] virtual u32  get_height()   const = 0;
+    [[nodiscard]] virtual bool should_close() const = 0;
+};
+```
+
+### 10.6 GraphicsDevice — `graphics_device.h`
 
 纯虚接口，`drivers/` 层实现：
 
@@ -828,8 +849,8 @@ class GraphicsDevice {
 public:
     virtual ~GraphicsDevice() = default;
 
-    // 生命周期
-    virtual bool init() = 0;
+    // 生命周期 — init 接收 WindowSystem 引用，driver 通过它创建 surface
+    virtual bool init(WindowSystem& window) = 0;
     virtual void shutdown() = 0;
 
     // 资源创建/销毁
@@ -879,7 +900,9 @@ public:
     virtual void wait_idle() = 0;
 
     // 交换链查询
-    virtual TextureHandle get_swapchain_texture() = 0;
+    virtual TextureHandle get_swapchain_texture() = 0;        // 当前帧的 image
+    virtual u32           get_swapchain_image_count() = 0;    // 交换链图像总数
+    virtual TextureHandle get_swapchain_texture_at(u32 i) = 0;// 第 i 个图像（用于预创建 framebuffer）
     virtual Format        get_swapchain_format() = 0;
     virtual u32           get_swapchain_width() = 0;
     virtual u32           get_swapchain_height() = 0;
@@ -889,6 +912,24 @@ public:
     virtual const char* get_api_name() const = 0;
 };
 ```
+
+### 10.7 伞形头文件 — `graphics.h`
+
+```cpp
+#include "core/graphics/graphics_types.h"
+#include "core/graphics/graphics_desc.h"
+#include "core/graphics/graphics_device.h"
+#include "core/graphics/window_system.h"
+```
+
+### 10.8 实现位置
+
+`GraphicsDevice` 与 `WindowSystem` 在 core 中只声明，**不实现**。具体实现：
+
+- **`drivers/vulkan/`** 实现 `GraphicsDevice`（详见 [DRIVERS.md](DRIVERS.md)）
+- **`platform/linux/Window`** 实现 `WindowSystem`（详见 [PLATFORM.md](PLATFORM.md)）
+
+依赖倒置在 `main/` 完成具体绑定：driver 通过 `WindowSystem&` 访问平台窗口，无需 include 平台头文件。
 
 ---
 
