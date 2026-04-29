@@ -10,22 +10,51 @@
 
 `vendor/` 是 **第三方依赖** 的唯一容纳处：
 
-- 所有第三方库源码或 git submodule 都在 `vendor/<libname>/`
+- 所有第三方库源码（**纯源码副本**，不带 `.git/`）都在 `vendor/<libname>/`
 - 由 `vendor/CMakeLists.txt` 包装为 CMake target，对外暴露 `Rover::<Lib>` 别名（或库自身原生 target）
 - 第一方代码 **绝不** 直接 add_subdirectory 到第三方库源码目录之外的位置
 
 ### 1.2 添加新依赖的流程（强制）
 
+> 架构决策：见 [ADR-0008](../product/adr/ADR-0008-vendor-manual-fetch.md)。`git submodule` / CMake `FetchContent` / `find_package` 系统库三者均**禁用**；唯一合法的引入方式是「下载源码副本到 `vendor/<libname>/` 并提交进 Rover 仓库」。
+
 向 vendor 引入新库**必须**：
 
 1. **写 ADR**：说明引入动机、考察过的替代方案、license 兼容性
 2. **更新本文档**的"已使用依赖"清单
-3. **更新 `vendor/CMakeLists.txt`**：包装为 target，定义编译宏
-4. **决定集成方式**：
-   - **首选** git submodule（清晰可追踪上游）
-   - **次选** vendored 源码副本（如果库无 git 或上游不稳定）
-   - **不选** `find_package`（要求开发者预装系统库，不可控）
-5. **首选** header-only 或静态库；动态库仅在确实必要时考虑
+3. **登记到 vendor manifest**：在 `misc/scripts/vendor/manifest.toml`（待 Phase 2 落地）记录上游 URL、版本号、SHA-256，确保任何人都能复现下载。
+4. **下载源码副本**到 `vendor/<libname>/`：
+
+   | 方式 | 何时使用 | 操作 |
+   | -- | -- | -- |
+   | **脚本下载（首选）** | manifest 已有该库 | `python misc/scripts/vendor/fetch.py <libname>`（脚本下载 tarball、校验 SHA-256、解压、清理 `.git/`/tests/docs，生成 diff） |
+   | **人工下载（兜底）** | 脚本暂未实现或库特殊 | `wget <url>` / `curl -L <url>` / 上游 release 解压；commit message 中说明来源 URL、版本号、SHA-256；同 PR 必须把该库登记到 manifest |
+
+   完成后 `git add vendor/<libname>/` 把源码作为仓库内容提交。
+
+5. **更新 `vendor/CMakeLists.txt`**：包装为 target，定义编译宏。优先 `add_subdirectory(...)`（库自带 CMake）或手写 INTERFACE / STATIC target（header-only 或简单源文件集合）。
+6. **首选** header-only 或静态库；动态库仅在确实必要时考虑（且必须仍然由 vendor 源码本地构建产生，不允许从系统加载）。
+
+### 1.2.1 禁止的集成方式
+
+| 方式 | 状态 | 原因（详见 ADR-0008） |
+| -- | -- | -- |
+| `git submodule add` | ❌ 禁止 | 网络脆弱、`git clone` 不带 `--recursive` 必坑、与离线构建目标冲突 |
+| CMake `FetchContent_Declare` / `ExternalProject_Add` | ❌ 禁止 | configure 阶段联网，破坏构建确定性，缓存不进 git 历史 |
+| `find_package(<SomeSystemLib> REQUIRED)` | ❌ 禁止 | 依赖开发者本机环境，破坏 hermetic onboarding |
+| 包管理器（vcpkg / Conan / xrepo） | ❌ 禁止 | 引入第二套依赖系统，违反 ADR-0002 单一构建系统 |
+
+> **澄清**：本规范禁的是**构建期**对开发者机器的探测（`find_package` 触发的 SDK / 系统库探测）。运行期通过 `dlopen` / `LoadLibrary` 加载系统驱动（如 Vulkan ICD `libvulkan.so.1`）是图形 API 的固有机制，不在禁用范围。换言之：Vulkan、OpenGL 这类驱动入口的**头文件必须 vendor**，但**运行期由系统 ICD 加载**是可以接受的。
+
+### 1.2.2 升级第三方库
+
+升级 = 改 manifest 中的版本号 + SHA-256 → 重跑 fetch 脚本 → diff 进 PR：
+
+1. 在分支上修改 `manifest.toml`
+2. 跑 `python misc/scripts/vendor/fetch.py <libname> --upgrade`
+3. 跑全套测试 + sanitizer
+4. 更新 `docs/dev/<area>.md` 中的版本号
+5. 写 commit message 标记升级原因（bug fix / 安全 / 新功能）
 
 ### 1.3 修改 vendor 源码（强制禁止）
 
@@ -35,30 +64,25 @@
   - 必要时写 wrapper（如 `vendor/<lib>_wrapper/`）封装一层
   - 极端情况下应 fork 并在文档中说明 fork 维护策略
 
-### 1.4 升级第三方库
-
-升级时：
-
-1. 在分支上更新 submodule / 源码
-2. 跑全套测试 + sanitizer
-3. 更新 `docs/dev/<area>.md` 中的版本号
-4. 写 commit message 标记升级原因（bug fix / 安全 / 新功能）
-
 ---
 
 ## 2. 当前 vendor 列表
 
+所有库均为「源码副本」形式提交在仓库内，不使用 git submodule（见 [ADR-0008](../product/adr/ADR-0008-vendor-manual-fetch.md)）。
+
 | 库 | 版本 / 来源 | License | 用途 | 集成方式 |
 |----|-----------|---------|------|---------|
-| **SDL3** | submodule | Zlib | 窗口 / 输入 / 计时（platform 层） | submodule + CMake |
-| **Vulkan-Headers** | submodule | Apache 2.0 | Vulkan API 头文件 | submodule + CMake |
-| **volk** | submodule | MIT | Vulkan 函数指针动态加载 | submodule + CMake |
-| **VulkanMemoryAllocator** | submodule | MIT | GPU 内存分配（VMA） | submodule + CMake (header-only) |
-| **glm** | submodule | MIT | 数学（vector / matrix / quat） | submodule + CMake (header-only) |
-| **EnTT** | submodule | MIT | ECS（用于 modules/scene） | submodule + CMake (header-only) |
-| **spdlog** | submodule | MIT | 日志（core/log 封装） | submodule + CMake |
-| **ImGui** | submodule | MIT | 编辑器 GUI（待 Phase 3） | submodule + CMake |
-| **doctest** | submodule | MIT | 单元测试框架 | submodule + CMake (header-only) |
+| **SDL3** | vendored | Zlib | 窗口 / 输入 / 计时（platform 层） | 源码副本 + `add_subdirectory` |
+| **Vulkan-Headers** | vendored（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | 当前临时由 `find_package(Vulkan)` 提供 |
+| **volk** | vendored | MIT | Vulkan 函数指针动态加载 | 源码副本 + `add_subdirectory` |
+| **VulkanMemoryAllocator** | vendored | MIT | GPU 内存分配（VMA） | 源码副本 + `add_subdirectory`（header-only） |
+| **glm** | vendored | MIT | 数学（vector / matrix / quat） | 源码副本 + INTERFACE target（header-only） |
+| **EnTT** | vendored | MIT | ECS（用于 modules/scene） | 源码副本 + INTERFACE target（header-only） |
+| **spdlog** | vendored | MIT | 日志（core/log 封装） | 源码副本 + `add_subdirectory` |
+| **ImGui** | vendored | MIT | 编辑器 GUI（待 Phase 3） | 源码副本 + 手写 STATIC target |
+| **doctest** | vendored | MIT | 单元测试框架 | 源码副本 + INTERFACE target（header-only） |
+
+¹ 当前 `vendor/CMakeLists.txt` 仍调用 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件，违反 §1.2.1。Phase 2 任务：把 `Vulkan-Headers` 源码 vendor 进 `vendor/Vulkan-Headers/` 并删除 `find_package` 调用（见 §2.3）。
 
 详见：[`vendor/CMakeLists.txt`](../../vendor/CMakeLists.txt)。
 
@@ -66,13 +90,14 @@
 
 | 库 | 用途 | Phase | License 待审 |
 |----|------|-------|-------------|
+| **slang** | Slang/HLSL → SPIR-V/DXIL/MSL/WGSL 转译器（[ADR-0007](../product/adr/ADR-0007-shader-source-language.md)） | Phase 2 | Apache 2.0 |
 | **tinygltf / cgltf** | GLTF 模型导入 | Phase 2 | MIT (tinygltf) / MIT (cgltf) |
 | **stb_image** | 图片解码（PNG/JPG） | Phase 2 | MIT/Public Domain |
 | **KTX-Software** | KTX2 纹理 | Phase 2 | Apache 2.0 |
 | **Basis Universal** | KTX2 转码后端 | Phase 2 | Apache 2.0 |
 | **miniaudio** 或 **OpenAL Soft** | 音频混音 | Phase 4 | MIT (miniaudio) / LGPL (OpenAL Soft) |
 | **Jolt Physics** 或 **Bullet** | 物理 | Phase 4 | MIT (Jolt) / Zlib (Bullet) |
-| **GLSL → 各后端 shader 转换器** | SPIRV-Cross / naga | Phase 6 | Apache 2.0 / MIT |
+| **dxc**（可选） | HLSL → DXIL（D3D12 后端） | Phase 6 | LLVM Apache 2.0 with LLVM Exception |
 
 最终选型由 ADR 决定。
 
@@ -83,6 +108,15 @@ Rover 自身计划开源（具体 license 待 v1.0 决定，候选 MIT / Apache 
 - ✅ MIT / BSD / Zlib / Apache 2.0 / Public Domain：直接可用
 - 🟡 LGPL：可链接（动态），需注意打包
 - ❌ GPL：禁止（除非有特例豁免，且记录在 ADR）
+
+### 2.3 Vulkan 处理（澄清）
+
+Vulkan 涉及两类入口，分别处理：
+
+- **构建期头文件**（`vulkan/vulkan.h` 等）：必须 vendor 进 `vendor/Vulkan-Headers/`，与其他库一视同仁。**禁止** `find_package(Vulkan)`。
+- **运行期加载器**（`libvulkan.so.1` / `vulkan-1.dll`）：由系统驱动栈提供，volk 通过 `dlopen` 动态加载。这是图形 API 的固有机制，不算「构建期探测系统库」，不在 ADR-0008 禁用范围内。**不**链接构建期 `Vulkan::Vulkan`，仅通过 volk 间接使用。
+
+Phase 2 迁移完成后，`vendor/CMakeLists.txt` 中应**完全无** `find_package` 调用。
 
 ---
 
@@ -234,6 +268,8 @@ modules/
 5. **license 兼容**：是否落入 §2.2 的允许 license？
 6. **二进制体积**：会增加多少二进制 / 编译时间？
 7. **替换成本**：未来想换掉时，被多少代码 include？
+8. **vendor 体积**：源码副本会让 Rover 仓库增加多少？是否需要 git-lfs？
+9. **下载源稳定性**：上游是否提供稳定 release tarball 与 SHA-256？
 
 任意一项答 "No / 不确定"，至少在 ADR 中明确说明。
 
@@ -260,6 +296,21 @@ target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)
 
 ❌ 在 core/CMakeLists.txt 中 target_link_libraries(rover_core PUBLIC SDL3::SDL3)
    → core 不应依赖 SDL（SDL 是平台细节）
+
+❌ 用 git submodule 引入新库
+   → git submodule add https://github.com/foo/bar vendor/bar
+   → 违反 ADR-0008；应当下载 release tarball 解压到 vendor/bar/ 并 git add 全部源码
+
+❌ 用 CMake FetchContent 拉取依赖
+   → FetchContent_Declare(foo URL https://...)
+   → 违反 ADR-0008；configure 阶段联网破坏构建确定性
+
+❌ 用 find_package 探测系统库（Vulkan 入口的运行期加载除外，且仍不允许构建期链接）
+   → find_package(SDL3 REQUIRED) → 拒绝，必须 vendor 源码
+   → find_package(spdlog REQUIRED) → 拒绝，必须 vendor 源码
+
+❌ 引入 vcpkg / Conan / xrepo 来管理第三方库
+   → 违反 ADR-0002（单一 CMake 构建系统）与 ADR-0008（手动下载策略）
 ```
 
 ---
@@ -271,6 +322,11 @@ target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)
 - 检查 driver / platform target 是否所有第三方 deps 都是 PRIVATE
 - 检查 services / modules 是否 include 了 driver / platform 头文件
 - 检查 vendor/ 是否有未提交的本地修改
+- **检查根目录不存在 `.gitmodules`**（强制 ADR-0008：禁用 submodule）
+- **检查仓库内 CMake 文件不出现 `FetchContent_Declare` / `ExternalProject_Add`**（强制 ADR-0008）
+- **检查 `vendor/CMakeLists.txt` 不出现 `find_package` 调用**（Vulkan 迁移完成后；过渡期允许 Vulkan 单点例外）
+- **检查每个 `vendor/<lib>/` 目录在 `manifest.toml` 中有对应条目**（强制 ADR-0008 §1.2 step 3）
+- **检查 vendor 源码副本不携带 `.git/`**（强制 ADR-0008 §1.2 step 4）
 
 ---
 
@@ -281,3 +337,5 @@ target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)
 - [`vendor/CMakeLists.txt`](../../vendor/CMakeLists.txt)
 - [ADR-0001 三层倒置](../product/adr/ADR-0001-three-layer-architecture.md)
 - [ADR-0002 单一 CMake 构建](../product/adr/ADR-0002-cmake-as-single-build-system.md)
+- [ADR-0007 Shader 源语言选 Slang/HLSL + 转译器](../product/adr/ADR-0007-shader-source-language.md)
+- [ADR-0008 vendor 手动下载（禁用 submodule / FetchContent / find_package）](../product/adr/ADR-0008-vendor-manual-fetch.md)

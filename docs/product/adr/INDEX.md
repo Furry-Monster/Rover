@@ -14,6 +14,8 @@
 | [ADR-0004](ADR-0004-services-vs-servers-naming.md) | 用 services 而不是 servers | Accepted | 2026-04-26 |
 | [ADR-0005](ADR-0005-cli-under-editor.md) | CLI 编辑器接口归属 editor/ | Accepted | 2026-04-26 |
 | [ADR-0006](ADR-0006-io-split-platform-and-serialization.md) | IO 拆分到 platform/ 与 modules/serialization/ | Accepted | 2026-04-26 |
+| [ADR-0007](ADR-0007-shader-source-language.md) | Shader 源语言选 Slang / HLSL + 转译器架构 | Accepted | 2026-04-29 |
+| [ADR-0008](ADR-0008-vendor-manual-fetch.md) | vendor 第三方依赖统一手动下载（禁用 submodule / FetchContent / find_package） | Accepted | 2026-04-29 |
 
 ---
 
