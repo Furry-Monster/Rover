@@ -249,8 +249,7 @@ set pagination off
 ### 6.3 GDB pretty-printer
 
 考虑加入：
-- glm 类型（vector / matrix）
-- `Vector3` / `Mat4` / `Quat`
+- `core/math`：`Vector2` / `Vector3` / `Vector4` / `Mat4` / `Quat`
 - `Ref<T>`、`Object*`
 
 待 Phase 2 实现 Variant 时一并加入 `misc/scripts/gdb/`（计划）。

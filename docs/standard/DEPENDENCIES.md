@@ -76,13 +76,14 @@
 | **Vulkan-Headers** | vendored（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | 当前临时由 `find_package(Vulkan)` 提供 |
 | **volk** | vendored | MIT | Vulkan 函数指针动态加载 | 源码副本 + `add_subdirectory` |
 | **VulkanMemoryAllocator** | vendored | MIT | GPU 内存分配（VMA） | 源码副本 + `add_subdirectory`（header-only） |
-| **glm** | vendored | MIT | 数学（vector / matrix / quat） | 源码副本 + INTERFACE target（header-only） |
 | **EnTT** | vendored | MIT | ECS（用于 modules/scene） | 源码副本 + INTERFACE target（header-only） |
 | **spdlog** | vendored | MIT | 日志（core/log 封装） | 源码副本 + `add_subdirectory` |
 | **ImGui** | vendored | MIT | 编辑器 GUI（待 Phase 3） | 源码副本 + 手写 STATIC target |
 | **doctest** | vendored | MIT | 单元测试框架 | 源码副本 + INTERFACE target（header-only） |
 
 ¹ 当前 `vendor/CMakeLists.txt` 仍调用 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件，违反 §1.2.1。Phase 2 任务：把 `Vulkan-Headers` 源码 vendor 进 `vendor/Vulkan-Headers/` 并删除 `find_package` 调用（见 §2.3）。
+
+**手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（仓库无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
 
 详见：[`vendor/CMakeLists.txt`](../../vendor/CMakeLists.txt)。
 
@@ -129,7 +130,6 @@ graph LR
     subgraph "Layer 0: vendor"
         SDL3
         Vulkan["Rover::Vulkan<br/>(volk+VMA+Headers)"]
-        glm
         spdlog
         entt
         doctest
@@ -163,7 +163,6 @@ graph LR
     Tests["rover_tests"]
 
     Core --> spdlog
-    Core --> glm
     Core --> entt
 
     DrvVk -.PRIVATE.-> Vulkan
@@ -192,7 +191,7 @@ graph LR
 
 | 关系 | 链接类型 | 原因 |
 |------|---------|------|
-| `rover_core` → `spdlog` / `glm` / `entt` | PUBLIC | 模板 / inline 函数让头文件需要看到这些类型 |
+| `rover_core` → `spdlog` / `entt` | PUBLIC | 模板 / inline 函数让头文件需要看到这些类型 |
 | `rover_driver_vulkan` → `Rover::Vulkan` | **PRIVATE** | Vulkan 头文件不暴露给上层，否则会污染 services / modules |
 | `rover_driver_vulkan` → `Rover::Core` | PUBLIC | 实现 `GraphicsDevice` 抽象需要其声明可见 |
 | `rover_platform_linux` → `SDL3::SDL3` | **PRIVATE** | SDL 是平台细节，不暴露 |

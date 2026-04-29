@@ -19,7 +19,7 @@ Rover 借鉴 Godot 的 **核心-服务-驱动** 三段式分层、Unity 的 **�
 
 ```mermaid
 graph BT
-    L0["Layer 0 — vendor/<br/>SDL3, Vulkan(volk+VMA), ImGui,<br/>spdlog, EnTT, glm, doctest"]
+    L0["Layer 0 — vendor/<br/>SDL3, Vulkan(volk+VMA), ImGui,<br/>spdlog, EnTT, doctest"]
     L1["Layer 1 — core/<br/>类型/数学/分配器/事件/任务/时间/<br/>变体/对象模型 + 抽象接口"]
     L2D["Layer 2 — drivers/<br/>vulkan, d3d12, metal, ...<br/>实现 core 抽象接口"]
     L2P["Layer 2 — platform/<br/>linux, windows, mac, android, ios, web<br/>OS 入口、窗口、文件系统"]
@@ -149,7 +149,6 @@ graph LR
         ImGui["imgui"]
         spdlog["spdlog"]
         entt["entt"]
-        glm["glm"]
         doctest["Rover::Doctest"]
         platlibs["rover_platform_libs<br/>(dl/pthread or user32/ws2_32)"]
     end
@@ -188,7 +187,6 @@ graph LR
     Tests["rover_tests"]
 
     Core --> spdlog
-    Core --> glm
     Core --> entt
     DrvVk --> Core
     DrvVk --> RoverVulkan

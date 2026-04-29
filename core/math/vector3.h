@@ -1,21 +1,26 @@
 #pragma once
 
+#include "core/math/math_defs.h"
 #include "core/typedefs.h"
 
-#include <glm/glm.hpp>
+#include <cmath>
 
 namespace rover
 {
 
+    /** Right-handed 3D vector; storage matches historical `.v.x` layout. */
     struct Vector3
     {
-        glm::vec3 v{0.0f, 0.0f, 0.0f};
+        struct
+        {
+            f32 x;
+            f32 y;
+            f32 z;
+        } v{};
 
         constexpr Vector3() noexcept = default;
 
-        constexpr Vector3(f32 x, f32 y, f32 z) noexcept : v(x, y, z) {}
-
-        constexpr Vector3(glm::vec3 vec) noexcept : v(vec) {}
+        constexpr Vector3(f32 x, f32 y, f32 z) noexcept : v{x, y, z} {}
 
         [[nodiscard]] constexpr f32& x() noexcept { return v.x; }
 
@@ -29,63 +34,98 @@ namespace rover
 
         [[nodiscard]] constexpr f32 z() const noexcept { return v.z; }
 
-        [[nodiscard]] constexpr operator glm::vec3() const noexcept { return v; }
+        [[nodiscard]] constexpr Vector3 operator+(const Vector3& rhs) const noexcept
+        {
+            return {v.x + rhs.v.x, v.y + rhs.v.y, v.z + rhs.v.z};
+        }
 
-        // Arithmetic
-        [[nodiscard]] constexpr Vector3 operator+(const Vector3& rhs) const noexcept { return {v + rhs.v}; }
+        [[nodiscard]] constexpr Vector3 operator-(const Vector3& rhs) const noexcept
+        {
+            return {v.x - rhs.v.x, v.y - rhs.v.y, v.z - rhs.v.z};
+        }
 
-        [[nodiscard]] constexpr Vector3 operator-(const Vector3& rhs) const noexcept { return {v - rhs.v}; }
+        [[nodiscard]] constexpr Vector3 operator*(const Vector3& rhs) const noexcept
+        {
+            return {v.x * rhs.v.x, v.y * rhs.v.y, v.z * rhs.v.z};
+        }
 
-        [[nodiscard]] constexpr Vector3 operator*(const Vector3& rhs) const noexcept { return {v * rhs.v}; }
+        [[nodiscard]] constexpr Vector3 operator/(const Vector3& rhs) const noexcept
+        {
+            return {v.x / rhs.v.x, v.y / rhs.v.y, v.z / rhs.v.z};
+        }
 
-        [[nodiscard]] constexpr Vector3 operator/(const Vector3& rhs) const noexcept { return {v / rhs.v}; }
+        [[nodiscard]] constexpr Vector3 operator*(f32 s) const noexcept { return {v.x * s, v.y * s, v.z * s}; }
 
-        [[nodiscard]] constexpr Vector3 operator*(f32 s) const noexcept { return {v * s}; }
-
-        [[nodiscard]] constexpr Vector3 operator/(f32 s) const noexcept { return {v / s}; }
+        [[nodiscard]] constexpr Vector3 operator/(f32 s) const noexcept { return {v.x / s, v.y / s, v.z / s}; }
 
         constexpr Vector3& operator+=(const Vector3& rhs) noexcept
         {
-            v += rhs.v;
+            v.x += rhs.v.x;
+            v.y += rhs.v.y;
+            v.z += rhs.v.z;
             return *this;
         }
 
         constexpr Vector3& operator-=(const Vector3& rhs) noexcept
         {
-            v -= rhs.v;
+            v.x -= rhs.v.x;
+            v.y -= rhs.v.y;
+            v.z -= rhs.v.z;
             return *this;
         }
 
         constexpr Vector3& operator*=(f32 s) noexcept
         {
-            v *= s;
+            v.x *= s;
+            v.y *= s;
+            v.z *= s;
             return *this;
         }
 
         constexpr Vector3& operator/=(f32 s) noexcept
         {
-            v /= s;
+            v.x /= s;
+            v.y /= s;
+            v.z /= s;
             return *this;
         }
 
-        [[nodiscard]] constexpr Vector3 operator-() const noexcept { return {-v}; }
+        [[nodiscard]] constexpr Vector3 operator-() const noexcept { return {-v.x, -v.y, -v.z}; }
 
-        [[nodiscard]] constexpr bool operator==(const Vector3& rhs) const noexcept { return v == rhs.v; }
+        [[nodiscard]] constexpr bool operator==(const Vector3& rhs) const noexcept
+        {
+            return v.x == rhs.v.x && v.y == rhs.v.y && v.z == rhs.v.z;
+        }
 
-        [[nodiscard]] constexpr bool operator!=(const Vector3& rhs) const noexcept { return v != rhs.v; }
-
-        // Geometric operations
-        [[nodiscard]] f32 length() const noexcept { return glm::length(v); }
+        [[nodiscard]] constexpr bool operator!=(const Vector3& rhs) const noexcept { return !(*this == rhs); }
 
         [[nodiscard]] constexpr f32 length_squared() const noexcept { return v.x * v.x + v.y * v.y + v.z * v.z; }
 
-        [[nodiscard]] Vector3 normalized() const noexcept { return {glm::normalize(v)}; }
+        [[nodiscard]] f32 length() const noexcept { return std::sqrt(length_squared()); }
 
-        [[nodiscard]] constexpr f32 dot(const Vector3& other) const noexcept { return glm::dot(v, other.v); }
+        [[nodiscard]] Vector3 normalized() const noexcept
+        {
+            const f32 ls = length_squared();
+            if (ls <= static_cast<f32>(EPSILON))
+            {
+                return {};
+            }
+            const f32 inv = 1.0f / std::sqrt(ls);
+            return {v.x * inv, v.y * inv, v.z * inv};
+        }
 
-        [[nodiscard]] constexpr Vector3 cross(const Vector3& other) const noexcept { return {glm::cross(v, other.v)}; }
+        [[nodiscard]] constexpr f32 dot(const Vector3& other) const noexcept
+        {
+            return v.x * other.v.x + v.y * other.v.y + v.z * other.v.z;
+        }
 
-        // Static constants
+        [[nodiscard]] constexpr Vector3 cross(const Vector3& other) const noexcept
+        {
+            return {v.y * other.v.z - v.z * other.v.y,
+                    v.z * other.v.x - v.x * other.v.z,
+                    v.x * other.v.y - v.y * other.v.x};
+        }
+
         static const Vector3 ZERO;
         static const Vector3 ONE;
         static const Vector3 UP;

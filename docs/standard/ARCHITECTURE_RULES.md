@@ -154,7 +154,7 @@ void unregister_<scope>_types();    // 关闭时反序调用，幂等
 
 | 依赖类型 | 何时使用 | 例子 |
 |---------|---------|-----|
-| `PUBLIC` | 头文件中 include 的 target | `target_link_libraries(rover_core PUBLIC spdlog glm entt)` |
+| `PUBLIC` | 头文件中 include 的 target | `target_link_libraries(rover_core PUBLIC spdlog entt)` |
 | `PRIVATE` | 仅 `.cpp` 中使用 | `target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)` |
 | `INTERFACE` | 自身无源码（接口库） | `target_link_libraries(Rover::CompileFlags INTERFACE ...)` |
 

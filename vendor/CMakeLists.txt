@@ -1,7 +1,6 @@
 message(STATUS "[Rover] Configuring vendor...")
 
-# Each engine layer links the specific vendor targets it needs (SDL3, glm,
-# spdlog, etc.). There is no Rover::Vendor aggregate -- consumers should
+# Each engine layer links vendor targets as needed (SDL3, spdlog, etc.).
 # request only what they depend on so transitive includes stay tight.
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -19,19 +18,8 @@ set(SDL_INSTALL      OFF CACHE BOOL "" FORCE)
 add_subdirectory("${ROVER_VENDOR_ROOT}/SDL" EXCLUDE_FROM_ALL)
 
 # ---------------------------------------------------------------------------
-# glm  (header-only)
-# ---------------------------------------------------------------------------
-add_library(glm INTERFACE)
-add_library(glm::glm ALIAS glm)
-target_include_directories(glm SYSTEM INTERFACE "${ROVER_VENDOR_ROOT}/glm")
-target_compile_definitions(glm INTERFACE
-    GLM_FORCE_DEPTH_ZERO_TO_ONE  # Vulkan clip space: depth [0, 1]
-    GLM_FORCE_RADIANS
-)
 
-# ---------------------------------------------------------------------------
-# Vulkan SDK  (system install, located via FindVulkan)
-# ---------------------------------------------------------------------------
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 find_package(Vulkan REQUIRED)
 message(STATUS "[Rover] Vulkan SDK: ${Vulkan_INCLUDE_DIRS}")
 

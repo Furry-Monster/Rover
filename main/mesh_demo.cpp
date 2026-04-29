@@ -156,7 +156,7 @@ namespace rover
             gp.pipeline_layout = d.pipeline_layout;
             gp.topology        = PrimitiveTopology::TriangleList;
             gp.cull_mode       = CullMode::Back;
-            // Negative viewport height flips NDC Y to match GLM; pairing CW fixes winding.
+            // Negative viewport height flips NDC Y to match Mat4::perspective clip space; pairing CW fixes winding.
             gp.front_face         = FrontFace::Clockwise;
             gp.depth_test_enable  = true;
             gp.depth_write_enable = true;
@@ -478,7 +478,7 @@ namespace rover
                 [&](PassBuilder& b) { b.write(color_id); },
                 [&](PassExecuteContext& ctx) {
                     ctx.device.cmd_bind_pipeline(ctx.cmd, demo.pipeline);
-                    // Vulkan NDC Y points down; negative viewport height matches GLM clip space.
+                    // Vulkan NDC Y points down; negative viewport height matches Mat4 perspective clip space.
                     Viewport vp{};
                     vp.x      = 0.0f;
                     vp.y      = static_cast<f32>(demo.fb_height);

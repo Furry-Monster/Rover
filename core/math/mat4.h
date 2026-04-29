@@ -4,19 +4,19 @@
 #include "core/math/vector4.h"
 #include "core/typedefs.h"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 namespace rover
 {
 
+    /**
+     * Column-major 4x4 transform (matches Vulkan / column-vector convention).
+     * Element (column `col`, row `row`) is accessed via operator()(col, row).
+     */
     struct Mat4
     {
-        glm::mat4 m{1.0f};
+        /** columns[col][row] */
+        f32 c[4][4]{};
 
-        constexpr Mat4() noexcept = default;
-
-        constexpr Mat4(glm::mat4 mat) noexcept : m(mat) {}
+        constexpr Mat4() noexcept { c[0][0] = c[1][1] = c[2][2] = c[3][3] = 1.0f; }
 
         constexpr Mat4(f32 c0r0,
                        f32 c0r1,
@@ -34,67 +34,101 @@ namespace rover
                        f32 c3r1,
                        f32 c3r2,
                        f32 c3r3) noexcept
-            : m(c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2, c3r3)
+            : c{{c0r0, c0r1, c0r2, c0r3}, {c1r0, c1r1, c1r2, c1r3}, {c2r0, c2r1, c2r2, c2r3}, {c3r0, c3r1, c3r2, c3r3}}
         {}
 
-        [[nodiscard]] constexpr operator glm::mat4() const noexcept { return m; }
+        [[nodiscard]] constexpr f32& operator()(i32 col, i32 row) noexcept { return c[col][row]; }
 
-        // Element access (column, row)
-        [[nodiscard]] constexpr f32& operator()(i32 col, i32 row) noexcept { return m[col][row]; }
+        [[nodiscard]] constexpr f32 operator()(i32 col, i32 row) const noexcept { return c[col][row]; }
 
-        [[nodiscard]] constexpr f32 operator()(i32 col, i32 row) const noexcept { return m[col][row]; }
+        [[nodiscard]] Mat4 operator*(const Mat4& rhs) const noexcept;
 
-        // Arithmetic
-        [[nodiscard]] constexpr Mat4 operator*(const Mat4& rhs) const noexcept { return {m * rhs.m}; }
-
-        [[nodiscard]] constexpr Vector4 operator*(const Vector4& rhs) const noexcept { return {m * rhs.v}; }
-
-        Mat4& operator*=(const Mat4& rhs) noexcept
+        [[nodiscard]] constexpr Vector4 operator*(const Vector4& rhs) const noexcept
         {
-            m *= rhs.m;
-            return *this;
+            return {
+                c[0][0] * rhs[0] + c[1][0] * rhs[1] + c[2][0] * rhs[2] + c[3][0] * rhs[3],
+                c[0][1] * rhs[0] + c[1][1] * rhs[1] + c[2][1] * rhs[2] + c[3][1] * rhs[3],
+                c[0][2] * rhs[0] + c[1][2] * rhs[1] + c[2][2] * rhs[2] + c[3][2] * rhs[3],
+                c[0][3] * rhs[0] + c[1][3] * rhs[1] + c[2][3] * rhs[2] + c[3][3] * rhs[3],
+            };
         }
 
-        [[nodiscard]] constexpr bool operator==(const Mat4& rhs) const noexcept { return m == rhs.m; }
+        Mat4& operator*=(const Mat4& rhs) noexcept;
 
-        [[nodiscard]] constexpr bool operator!=(const Mat4& rhs) const noexcept { return m != rhs.m; }
+        [[nodiscard]] constexpr bool operator==(const Mat4& rhs) const noexcept
+        {
+            for (int col = 0; col < 4; ++col)
+            {
+                for (int row = 0; row < 4; ++row)
+                {
+                    if (c[col][row] != rhs.c[col][row])
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
-        // Operations
-        [[nodiscard]] Mat4 inverse() const noexcept { return {glm::inverse(m)}; }
+        [[nodiscard]] constexpr bool operator!=(const Mat4& rhs) const noexcept { return !(*this == rhs); }
 
-        [[nodiscard]] Mat4 transpose() const noexcept { return {glm::transpose(m)}; }
+        [[nodiscard]] Mat4 inverse() const noexcept;
 
-        [[nodiscard]] f32 determinant() const noexcept { return glm::determinant(m); }
+        [[nodiscard]] Mat4 transpose() const noexcept;
 
-        // Factory methods
+        [[nodiscard]] f32 determinant() const noexcept;
+
         [[nodiscard]] static constexpr Mat4 identity() noexcept { return {}; }
 
-        [[nodiscard]] static Mat4 translate(const Vector3& translation) noexcept
+        [[nodiscard]] static constexpr Mat4 translate(const Vector3& t) noexcept
         {
-            return {glm::translate(glm::mat4{1.0f}, translation.v)};
+            Mat4 m{};
+            m.c[0][0] = m.c[1][1] = m.c[2][2] = m.c[3][3] = 1.0f;
+            m.c[3][0]                                     = t.v.x;
+            m.c[3][1]                                     = t.v.y;
+            m.c[3][2]                                     = t.v.z;
+            return m;
         }
 
-        [[nodiscard]] static Mat4 rotate(f32 angle, const Vector3& axis) noexcept
+        [[nodiscard]] static constexpr Mat4 scale(const Vector3& s) noexcept
         {
-            return {glm::rotate(glm::mat4{1.0f}, angle, axis.v)};
+            Mat4 m{};
+            m.c[0][0] = s.v.x;
+            m.c[1][1] = s.v.y;
+            m.c[2][2] = s.v.z;
+            m.c[3][3] = 1.0f;
+            return m;
         }
 
-        [[nodiscard]] static Mat4 scale(const Vector3& s) noexcept { return {glm::scale(glm::mat4{1.0f}, s.v)}; }
+        /** Vertical field of view in radians; clip-space Z in [0,1] for Vulkan. */
+        [[nodiscard]] static Mat4 perspective(f32 fovy, f32 aspect, f32 z_near, f32 z_far) noexcept;
 
-        [[nodiscard]] static Mat4 perspective(f32 fov, f32 aspect, f32 near, f32 far) noexcept
-        {
-            return {glm::perspective(fov, aspect, near, far)};
-        }
+        [[nodiscard]] static Mat4 ortho(f32 left, f32 right, f32 bottom, f32 top, f32 z_near, f32 z_far) noexcept;
 
-        [[nodiscard]] static Mat4 ortho(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) noexcept
-        {
-            return {glm::ortho(left, right, bottom, top, near, far)};
-        }
+        [[nodiscard]] static Mat4 look_at(const Vector3& eye, const Vector3& center, const Vector3& up) noexcept;
 
-        [[nodiscard]] static Mat4 look_at(const Vector3& eye, const Vector3& center, const Vector3& up) noexcept
-        {
-            return {glm::lookAt(eye.v, center.v, up.v)};
-        }
+        [[nodiscard]] static Mat4 rotate(f32 angle, const Vector3& axis) noexcept;
     };
+
+    inline Mat4 Mat4::operator*(const Mat4& rhs) const noexcept
+    {
+        Mat4 out{};
+        for (int col = 0; col < 4; ++col)
+        {
+            const Vector4 v{rhs.c[col][0], rhs.c[col][1], rhs.c[col][2], rhs.c[col][3]};
+            const Vector4 o = (*this) * v;
+            out.c[col][0]   = o[0];
+            out.c[col][1]   = o[1];
+            out.c[col][2]   = o[2];
+            out.c[col][3]   = o[3];
+        }
+        return out;
+    }
+
+    inline Mat4& Mat4::operator*=(const Mat4& rhs) noexcept
+    {
+        *this = *this * rhs;
+        return *this;
+    }
 
 } // namespace rover

@@ -69,7 +69,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | ID | 描述 | 状态 | 实现版本 / 计划 | 备注 |
 |----|------|------|----------------|-----|
 | F-201 | 提供日志系统（多通道、级别过滤） | Implemented | v0.1 | core/log/，spdlog 封装 |
-| F-202 | 提供数学库（向量 / 矩阵 / 四元数 / 变换） | Implemented | v0.1 | core/math/，glm 薄封装 |
+| F-202 | 提供数学库（向量 / 矩阵 / 四元数 / 变换） | Implemented | v0.1 | core/math/，手写实现 |
 | F-203 | 提供分配器（线性 / 池 / Arena） | Implemented | v0.1 | core/allocator/ |
 | F-204 | 提供事件总线 + Signal/Delegate | Implemented | v0.1 | core/event/ |
 | F-205 | 提供 Job 系统（work-stealing） | Implemented | v0.1 | core/task/ |

@@ -1,21 +1,24 @@
 #pragma once
 
+#include "core/math/math_defs.h"
 #include "core/typedefs.h"
 
-#include <glm/glm.hpp>
+#include <cmath>
 
 namespace rover
 {
 
     struct Vector2
     {
-        glm::vec2 v{0.0f, 0.0f};
+        struct
+        {
+            f32 x;
+            f32 y;
+        } v{};
 
         constexpr Vector2() noexcept = default;
 
-        constexpr Vector2(f32 x, f32 y) noexcept : v(x, y) {}
-
-        constexpr Vector2(glm::vec2 vec) noexcept : v(vec) {}
+        constexpr Vector2(f32 x, f32 y) noexcept : v{x, y} {}
 
         [[nodiscard]] constexpr f32& x() noexcept { return v.x; }
 
@@ -25,66 +28,92 @@ namespace rover
 
         [[nodiscard]] constexpr f32 y() const noexcept { return v.y; }
 
-        [[nodiscard]] constexpr operator glm::vec2() const noexcept { return v; }
+        [[nodiscard]] constexpr Vector2 operator+(const Vector2& rhs) const noexcept
+        {
+            return {v.x + rhs.v.x, v.y + rhs.v.y};
+        }
 
-        // Arithmetic
-        [[nodiscard]] constexpr Vector2 operator+(const Vector2& rhs) const noexcept { return {v + rhs.v}; }
+        [[nodiscard]] constexpr Vector2 operator-(const Vector2& rhs) const noexcept
+        {
+            return {v.x - rhs.v.x, v.y - rhs.v.y};
+        }
 
-        [[nodiscard]] constexpr Vector2 operator-(const Vector2& rhs) const noexcept { return {v - rhs.v}; }
+        [[nodiscard]] constexpr Vector2 operator*(const Vector2& rhs) const noexcept
+        {
+            return {v.x * rhs.v.x, v.y * rhs.v.y};
+        }
 
-        [[nodiscard]] constexpr Vector2 operator*(const Vector2& rhs) const noexcept { return {v * rhs.v}; }
+        [[nodiscard]] constexpr Vector2 operator/(const Vector2& rhs) const noexcept
+        {
+            return {v.x / rhs.v.x, v.y / rhs.v.y};
+        }
 
-        [[nodiscard]] constexpr Vector2 operator/(const Vector2& rhs) const noexcept { return {v / rhs.v}; }
+        [[nodiscard]] constexpr Vector2 operator*(f32 s) const noexcept { return {v.x * s, v.y * s}; }
 
-        [[nodiscard]] constexpr Vector2 operator*(f32 s) const noexcept { return {v * s}; }
-
-        [[nodiscard]] constexpr Vector2 operator/(f32 s) const noexcept { return {v / s}; }
+        [[nodiscard]] constexpr Vector2 operator/(f32 s) const noexcept { return {v.x / s, v.y / s}; }
 
         constexpr Vector2& operator+=(const Vector2& rhs) noexcept
         {
-            v += rhs.v;
+            v.x += rhs.v.x;
+            v.y += rhs.v.y;
             return *this;
         }
 
         constexpr Vector2& operator-=(const Vector2& rhs) noexcept
         {
-            v -= rhs.v;
+            v.x -= rhs.v.x;
+            v.y -= rhs.v.y;
             return *this;
         }
 
         constexpr Vector2& operator*=(f32 s) noexcept
         {
-            v *= s;
+            v.x *= s;
+            v.y *= s;
             return *this;
         }
 
         constexpr Vector2& operator/=(f32 s) noexcept
         {
-            v /= s;
+            v.x /= s;
+            v.y /= s;
             return *this;
         }
 
-        [[nodiscard]] constexpr Vector2 operator-() const noexcept { return {-v}; }
+        [[nodiscard]] constexpr Vector2 operator-() const noexcept { return {-v.x, -v.y}; }
 
-        [[nodiscard]] constexpr bool operator==(const Vector2& rhs) const noexcept { return v == rhs.v; }
+        [[nodiscard]] constexpr bool operator==(const Vector2& rhs) const noexcept
+        {
+            return v.x == rhs.v.x && v.y == rhs.v.y;
+        }
 
-        [[nodiscard]] constexpr bool operator!=(const Vector2& rhs) const noexcept { return v != rhs.v; }
-
-        // Geometric operations
-        [[nodiscard]] f32 length() const noexcept { return glm::length(v); }
+        [[nodiscard]] constexpr bool operator!=(const Vector2& rhs) const noexcept { return !(*this == rhs); }
 
         [[nodiscard]] constexpr f32 length_squared() const noexcept { return v.x * v.x + v.y * v.y; }
 
-        [[nodiscard]] Vector2 normalized() const noexcept { return {glm::normalize(v)}; }
+        [[nodiscard]] f32 length() const noexcept { return std::sqrt(length_squared()); }
 
-        [[nodiscard]] constexpr f32 dot(const Vector2& other) const noexcept { return glm::dot(v, other.v); }
+        [[nodiscard]] Vector2 normalized() const noexcept
+        {
+            const f32 ls = length_squared();
+            if (ls <= static_cast<f32>(EPSILON))
+            {
+                return {};
+            }
+            const f32 inv = 1.0f / std::sqrt(ls);
+            return {v.x * inv, v.y * inv};
+        }
+
+        [[nodiscard]] constexpr f32 dot(const Vector2& other) const noexcept
+        {
+            return v.x * other.v.x + v.y * other.v.y;
+        }
 
         [[nodiscard]] constexpr f32 cross(const Vector2& other) const noexcept
         {
             return v.x * other.v.y - v.y * other.v.x;
         }
 
-        // Static constants
         static const Vector2 ZERO;
         static const Vector2 ONE;
         static const Vector2 UP;

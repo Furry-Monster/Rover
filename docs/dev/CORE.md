@@ -26,21 +26,21 @@
 
 ## 1. 概述
 
-`core/` 是 Rover 引擎的 **Layer 1**，为整个引擎提供基础设施。它 **只依赖** `vendor/` 中的第三方库（spdlog、glm、EnTT），**绝不** 依赖 `drivers/`、`services/`、`modules/` 或 `editor/`。
+`core/` 是 Rover 引擎的 **Layer 1**，为整个引擎提供基础设施。它 **只依赖** `vendor/` 中的第三方库（spdlog、EnTT），**绝不** 依赖 `drivers/`、`services/`、`modules/` 或 `editor/`。
 
 Core 包含 7 个子系统：
 
 | 子系统 | 目录 | 职责 |
 |--------|------|------|
 | **日志** | `core/log/` | spdlog 封装，引擎/游戏双通道日志 |
-| **数学** | `core/math/` | 向量、矩阵、四元数、AABB、变换（glm 薄封装） |
+| **数学** | `core/math/` | 向量、矩阵、四元数、AABB、变换（手写，列主序，Vulkan NDC Z∈[0,1]） |
 | **分配器** | `core/allocator/` | 线性分配器、池分配器、Arena 分配器 |
 | **事件** | `core/event/` | Delegate、Signal、EventBus |
 | **任务** | `core/task/` | 基于 std::jthread 的 Job System（work-stealing） |
 | **对象模型** | `core/object/` | Object 基类、ClassDB 反射注册、RefCounted |
 | **图形抽象** | `core/graphics/` | GraphicsDevice 纯虚接口、GPU 资源句柄与描述符 |
 
-CMake target：`rover_core`（别名 `Rover::Core`），类型 STATIC，依赖 `spdlog`、`glm`、`entt`。
+CMake target：`rover_core`（别名 `Rover::Core`），类型 STATIC，依赖 `spdlog`、`entt`。
 
 ---
 
@@ -58,11 +58,11 @@ core/
 │
 ├── math/
 │   ├── math_defs.h                     常量与工具函数
-│   ├── vector2.h                       Vector2（glm::vec2 封装）
-│   ├── vector3.h                       Vector3（glm::vec3 封装）
-│   ├── vector4.h                       Vector4（glm::vec4 封装）
-│   ├── mat4.h                          Mat4（glm::mat4 封装）
-│   ├── quat.h                          Quat（glm::quat 封装）
+│   ├── vector2.h                       Vector2
+│   ├── vector3.h                       Vector3
+│   ├── vector4.h                       Vector4
+│   ├── mat4.h / mat4.cpp               Mat4（透视投影 RH，clip Z [0,1]）
+│   ├── quat.h                          Quat（`.v` 为 x,y,z,w）
 │   ├── aabb.h                          AABB（轴对齐包围盒）
 │   ├── transform3d.h                   Transform3D（位置/旋转/缩放）
 │   └── math.h                          伞形头文件
@@ -188,11 +188,11 @@ ROVER_APP_DEBUG("Player position: ({}, {}, {})", x, y, z);
 
 ### 5.1 设计原则
 
-- **Header-only**：所有数学类型为头文件定义，利于内联优化
-- **glm 薄封装**：每个类型内部持有对应的 glm 类型成员（`glm::vec3`、`glm::mat4` 等），通过 `constexpr` 方法委托给 glm
-- **隐式转换**：所有类型支持与 glm 对应类型的隐式互转（构造函数 + `operator`）
+- **手写标量实现**：向量 / 四元数为头文件；`Mat4` 的求逆与部分工厂放在 `mat4.cpp`，避免符号膨胀。
+- **列主序**：与 Vulkan、着色器约定一致；`Mat4::perspective` / `ortho` 输出 **clip-space Z ∈ [0, 1]**（Vulkan）。
+- **四元数布局**：与 Godot 一致，分量存放在 `.v.x`/`.v.y`/`.v.z`/`.v.w`。
 - **`[[nodiscard]]`**：返回值的方法标记 `[[nodiscard]]` 防止忽略结果
-- **Trivially copyable**：所有数学类型可安全 memcpy
+- **Trivially copyable**：向量 / Quat / Mat4 可安全 memcpy / POD 用法
 
 ### 5.2 常量与工具 — `math_defs.h`
 
@@ -215,67 +215,48 @@ ROVER_APP_DEBUG("Player position: ({}, {}, {})", x, y, z);
 
 ```cpp
 struct Vector2 {
-    glm::vec2 v{0.0f, 0.0f};
-    // 构造：默认(0,0)、(x,y)、从 glm::vec2
-    // 访问器：x(), y()（可变与只读）
-    // 运算符：+ - * / += -= *= /= 一元- == !=
-    // 几何：length(), length_squared(), normalized(), dot(), cross()（返回标量）
-    // 静态常量：ZERO, ONE, UP, DOWN, LEFT, RIGHT
+    struct { float x, y; } v{};
+    // 构造：默认(0,0)、(x,y)
+    // 访问器：x(), y()
+    // …
 };
 ```
-
-自由函数：`f32 * Vector2` 交换律支持。
 
 ### 5.4 Vector3 — `vector3.h`
 
 与 Vector2 同构，增加 z 分量。
 
-- `cross()` 返回 `Vector3`（3D 叉积）
-- 静态常量增加 `FORWARD{0,0,-1}` 和 `BACK{0,0,1}`（右手坐标系，-Z 向前）
+- `cross()` 返回 `Vector3`（右手系）
+- 静态常量 `FORWARD{0,0,-1}`、`BACK{0,0,1}`
 
 ### 5.5 Vector4 — `vector4.h`
 
-与 Vector3 同构，增加 w 分量。无 `cross()` 方法。静态常量仅 `ZERO` 和 `ONE`。
+与 Vector3 同构，增加 w；提供 `operator[](0..3)` 便于矩阵乘法。
 
-### 5.6 Mat4 — `mat4.h`
+### 5.6 Mat4 — `mat4.h` / `mat4.cpp`
 
 ```cpp
 struct Mat4 {
-    glm::mat4 m{1.0f};  // 默认为单位矩阵
+    float c[4][4]; // columns[col][row]
 
-    // 元素访问：operator()(col, row)
-    // 运算符：矩阵乘法 *、变换 Vector4 *、*=、== !=
-    // 方法：inverse(), transpose(), determinant()
-    // 工厂方法：
-    static Mat4 identity();
-    static Mat4 translate(const Vector3&);
-    static Mat4 rotate(f32 angle, const Vector3& axis);
-    static Mat4 scale(const Vector3&);
-    static Mat4 perspective(f32 fov, f32 aspect, f32 near, f32 far);
-    static Mat4 ortho(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far);
-    static Mat4 look_at(const Vector3& eye, const Vector3& center, const Vector3& up);
+    constexpr Vector4 operator*(const Vector4&) const;
+    Mat4 inverse() const; // Gauss–Jordan，实现在 mat4.cpp
+    static Mat4 perspective(...); // RH，Vulkan Z
+    ...
 };
 ```
-
-**注意**：glm 使用列主序（column-major），与 Vulkan 一致。`perspective()` 输出 Vulkan 深度范围 `[0, 1]`（由 `GLM_FORCE_DEPTH_ZERO_TO_ONE` 保证）。
 
 ### 5.7 Quat — `quat.h`
 
 ```cpp
 struct Quat {
-    glm::quat q{1.0f, 0.0f, 0.0f, 0.0f};  // 默认为单位四元数 (w=1)
+    struct { float x, y, z, w; } v{}; // Godot 顺序：向量 part + 标量 w
 
-    // 访问器：w(), x(), y(), z()
-    // 运算符：四元数乘法 *、旋转 Vector3 *
-    // 方法：normalized(), inverse(), dot(), slerp(), to_mat4()
-    // 工厂方法：
-    static Quat identity();
-    static Quat from_axis_angle(const Vector3& axis, f32 angle);
-    static Quat from_euler(f32 pitch, f32 yaw, f32 roll);
+    Quat(float scalar_w, float vx, float vy, float vz); // 兼容旧调用顺序 (w,x,y,z)
+    Vector3 operator*(const Vector3&) const; // v + 2*(q_vec × (q_vec × v)) …
+    ...
 };
 ```
-
-`operator*(Vector3)` 使用 `glm::rotate(q, vec)` 实现四元数旋转向量。
 
 ### 5.8 AABB — `aabb.h`
 
@@ -976,7 +957,7 @@ void unregister_core_types() {
 | 子系统 | 依赖的 vendor 库 |
 |--------|-----------------|
 | log | spdlog |
-| math | glm |
+| math | （手写；`<cmath>`） |
 | allocator | 无（仅标准库） |
 | event | 无（仅标准库） |
 | task | 无（仅标准库 `<thread>`, `<atomic>`） |
@@ -990,7 +971,7 @@ typedefs.h          ← 被所有子系统依赖
     ↓
 math_defs.h
     ↓
-vector2/3/4.h       ← 依赖 typedefs.h + glm
+vector2/3/4.h       ← 依赖 typedefs.h + `<cmath>`
     ↓
 mat4.h              ← 依赖 vector3.h, vector4.h
     ↓
