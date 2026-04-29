@@ -1,21 +1,24 @@
 #include "drivers/register_driver_types.h"
 
 #ifdef ROVER_DRIVER_VULKAN
-#include "drivers/vulkan/register_types.h"
+    #include "drivers/vulkan/register_types.h"
 #endif
 
-namespace rover {
+namespace rover
+{
 
-void register_driver_types() {
+    void register_driver_types()
+    {
 #ifdef ROVER_DRIVER_VULKAN
-    register_vulkan_driver();
+        register_vulkan_driver();
 #endif
-}
+    }
 
-void unregister_driver_types() {
+    void unregister_driver_types()
+    {
 #ifdef ROVER_DRIVER_VULKAN
-    unregister_vulkan_driver();
+        unregister_vulkan_driver();
 #endif
-}
+    }
 
 } // namespace rover

@@ -4,20 +4,22 @@
 
 #include <atomic>
 
-namespace rover {
+namespace rover
+{
 
-class RefCounted : public Object {
-    ROVER_CLASS(RefCounted, Object)
+    class RefCounted : public Object
+    {
+        ROVER_CLASS(RefCounted, Object)
 
-public:
-    RefCounted() = default;
+    public:
+        RefCounted() = default;
 
-    void add_ref();
-    bool release();
-    u32 ref_count() const;
+        void add_ref();
+        bool release();
+        u32  ref_count() const;
 
-private:
-    std::atomic<u32> ref_count_{1};
-};
+    private:
+        std::atomic<u32> ref_count_{1};
+    };
 
 } // namespace rover

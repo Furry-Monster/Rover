@@ -1,8 +1,9 @@
 #pragma once
 
-namespace rover {
+namespace rover
+{
 
-void register_editor_cli();
-void unregister_editor_cli();
+    void register_editor_cli();
+    void unregister_editor_cli();
 
 } // namespace rover

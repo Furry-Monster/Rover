@@ -1,13 +1,16 @@
 #include "modules/animation/register_types.h"
 
-namespace rover {
+namespace rover
+{
 
-void register_animation_types() {
-    // TODO: register skeletal animation, blend trees, state machines.
-}
+    void register_animation_types()
+    {
+        // TODO: register skeletal animation, blend trees, state machines.
+    }
 
-void unregister_animation_types() {
-    // TODO: shutdown animation module.
-}
+    void unregister_animation_types()
+    {
+        // TODO: shutdown animation module.
+    }
 
 } // namespace rover

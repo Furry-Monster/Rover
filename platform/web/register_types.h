@@ -1,8 +1,9 @@
 #pragma once
 
-namespace rover {
+namespace rover
+{
 
-void register_web_platform();
-void unregister_web_platform();
+    void register_web_platform();
+    void unregister_web_platform();
 
 } // namespace rover

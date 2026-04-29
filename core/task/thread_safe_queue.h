@@ -1,68 +1,78 @@
 #pragma once
 
+#include "core/typedefs.h"
+
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 
-#include "core/typedefs.h"
+namespace rover
+{
 
-namespace rover {
+    template <typename T>
+    class ThreadSafeQueue
+    {
+    public:
+        void push(T item)
+        {
+            {
+                std::lock_guard lock(mutex_);
+                queue_.push(std::move(item));
+            }
+            cv_.notify_one();
+        }
 
-template <typename T>
-class ThreadSafeQueue {
-public:
-    void push(T item) {
+        bool try_pop(T& out)
         {
             std::lock_guard lock(mutex_);
-            queue_.push(std::move(item));
+            if (queue_.empty())
+            {
+                return false;
+            }
+            out = std::move(queue_.front());
+            queue_.pop();
+            return true;
         }
-        cv_.notify_one();
-    }
 
-    bool try_pop(T& out) {
-        std::lock_guard lock(mutex_);
-        if (queue_.empty()) {
-            return false;
+        bool wait_pop(T& out)
+        {
+            std::unique_lock lock(mutex_);
+            cv_.wait(lock, [this] { return !queue_.empty() || shutdown_; });
+            if (shutdown_ && queue_.empty())
+            {
+                return false;
+            }
+            out = std::move(queue_.front());
+            queue_.pop();
+            return true;
         }
-        out = std::move(queue_.front());
-        queue_.pop();
-        return true;
-    }
 
-    bool wait_pop(T& out) {
-        std::unique_lock lock(mutex_);
-        cv_.wait(lock, [this] { return !queue_.empty() || shutdown_; });
-        if (shutdown_ && queue_.empty()) {
-            return false;
+        void shutdown()
+        {
+            {
+                std::lock_guard lock(mutex_);
+                shutdown_ = true;
+            }
+            cv_.notify_all();
         }
-        out = std::move(queue_.front());
-        queue_.pop();
-        return true;
-    }
 
-    void shutdown() {
+        bool is_empty() const
         {
             std::lock_guard lock(mutex_);
-            shutdown_ = true;
+            return queue_.empty();
         }
-        cv_.notify_all();
-    }
 
-    bool is_empty() const {
-        std::lock_guard lock(mutex_);
-        return queue_.empty();
-    }
+        usize size() const
+        {
+            std::lock_guard lock(mutex_);
+            return queue_.size();
+        }
 
-    usize size() const {
-        std::lock_guard lock(mutex_);
-        return queue_.size();
-    }
-
-private:
-    std::queue<T> queue_;
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
-    bool shutdown_ = false;
-};
+    private:
+        std::queue<T>           queue_;
+        mutable std::mutex      mutex_;
+        std::condition_variable cv_;
+        bool                    shutdown_ = false;
+    };
 
 } // namespace rover

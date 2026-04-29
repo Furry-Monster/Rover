@@ -1,8 +1,9 @@
 #pragma once
 
-namespace rover {
+namespace rover
+{
 
-void register_driver_types();
-void unregister_driver_types();
+    void register_driver_types();
+    void unregister_driver_types();
 
 } // namespace rover

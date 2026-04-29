@@ -538,13 +538,21 @@ TEST_CASE("Vector3 dot product") {
 - [x] **tests/**：core 子系统单元测试（75 cases / 255 assertions），doctest 框架就绪
 - [x] **misc/scripts/**：`rover-cli` 工程化 Python 开发者 CLI（configure / build / clean / run / debug / test / format / shaders / status）
 
-### Phase 2 及之后
+### Phase 2 (v0.2 — 进行中)
 
-- [ ] **services/graphics/**：`GraphicsService` 单例，Frame Graph
-- [ ] **modules/scene/**：EnTT World、`Entity`/`Component` 反射、场景树
-- [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser
-- [ ] **editor/cli/**：命令解析（建议用 `argparse` 风格），暴露 `import / export / build` 等
-- [ ] **tests/services & drivers/**：`GraphicsDevice` mock + `GraphicsService` 单元测试，集成测试穿过 driver 层
+- [x] **core/variant/**：`Variant` (union+tag, 64B inline) + `Callable` 类型擦除调用
+- [x] **core/os/**：`FileAccess` / `DirAccess` 抽象 + `platform/linux/` POSIX 实现
+- [x] **core/object/**：ClassDB 增强 (`register_property` + `PropertyInfo` getter/setter)
+- [x] **core/graphics/**：BindGroupLayout / BindGroup / PipelineLayout / push constants 抽象
+- [x] **drivers/vulkan/**：descriptor pool、staging buffer 自动上传、`update_texture` 完整实现
+- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph` (pass DAG + auto-cmd-list)
+- [x] **modules/scene/**：EnTT 4 `World` 包装、Entity handle、内置 components（Transform/Mesh/Camera/Light/Name/Hierarchy）+ SceneTree 父子链
+- [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
+- [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）
+- [x] **main/mesh_demo**：ECS 立方体 + 相机 + 平行光 demo，FrameGraph 驱动
+- [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser（Phase 3）
+- [ ] **editor/cli/**：命令解析、暴露 `import / export / build`（Phase 3）
+- [ ] **tests/services & drivers/**：`GraphicsDevice` mock 已落地 ([tests/services/frame_graph_test.cpp](../../tests/services/frame_graph_test.cpp))；穿过 driver 层的集成测试推迟到有 headless GPU CI
 
 ### 子系统详细文档
 

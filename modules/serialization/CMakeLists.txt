@@ -7,5 +7,6 @@ rover_add_library(rover_module_serialization
     PUBLIC_DEPS
         Rover::Core
         Rover::Services
+        rover_module_scene
     FOLDER "Rover/Modules"
 )

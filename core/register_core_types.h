@@ -1,8 +1,9 @@
 #pragma once
 
-namespace rover {
+namespace rover
+{
 
-void register_core_types();
-void unregister_core_types();
+    void register_core_types();
+    void unregister_core_types();
 
 } // namespace rover

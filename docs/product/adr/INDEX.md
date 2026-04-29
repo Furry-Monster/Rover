@@ -16,6 +16,8 @@
 | [ADR-0006](ADR-0006-io-split-platform-and-serialization.md) | IO 拆分到 platform/ 与 modules/serialization/ | Accepted | 2026-04-26 |
 | [ADR-0007](ADR-0007-shader-source-language.md) | Shader 源语言选 Slang / HLSL + 转译器架构 | Accepted | 2026-04-29 |
 | [ADR-0008](ADR-0008-vendor-manual-fetch.md) | vendor 第三方依赖统一手动下载（禁用 submodule / FetchContent / find_package） | Accepted | 2026-04-29 |
+| [ADR-0009](ADR-0009-variant-implementation-strategy.md) | Variant 实现策略：手写 union + tag + 64B inline 缓冲区 | Accepted | 2026-04-29 |
+| [ADR-0010](ADR-0010-graphics-bind-group-design.md) | GraphicsDevice 描述符绑定：WebGPU 风格 BindGroup | Accepted | 2026-04-29 |
 
 ---
 

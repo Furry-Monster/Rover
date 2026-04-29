@@ -16,6 +16,7 @@ target_link_libraries(rover_tests
         Rover::Core
         Rover::Services
         Rover::Modules
+        Rover::Platform
         Rover::Doctest
 )
 

@@ -21,6 +21,18 @@ rover_add_shader(_main_shader_headers
     VAR        triangle_frag_spv
     OUTPUT_DIR "${_shader_out_dir}")
 
+rover_add_shader(_main_shader_headers
+    SHADER     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.vert.glsl"
+    STAGE      vert
+    VAR        mesh_vert_spv
+    OUTPUT_DIR "${_shader_out_dir}")
+
+rover_add_shader(_main_shader_headers
+    SHADER     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.frag.glsl"
+    STAGE      frag
+    VAR        mesh_frag_spv
+    OUTPUT_DIR "${_shader_out_dir}")
+
 # ---------------------------------------------------------------------------
 # rover -- executable composition root.
 #
@@ -28,7 +40,10 @@ rover_add_shader(_main_shader_headers
 # selected concrete drivers and platform implementations. This is the only
 # place where dependency inversion is resolved into concrete bindings.
 # ---------------------------------------------------------------------------
-add_executable(rover main.cpp ${_main_shader_headers})
+add_executable(rover
+    main.cpp
+    mesh_demo.cpp
+    ${_main_shader_headers})
 
 target_link_libraries(rover
     PRIVATE
