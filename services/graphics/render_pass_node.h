@@ -69,7 +69,9 @@ namespace rover
         // `set_color_attachment(...)` for clarity.
         FramebufferHandle framebuffer = INVALID_HANDLE;
         bool              has_clear   = false;
-        ClearValue        clear{};
+        /** When true and framebuffer includes depth, pass two clears (color + depth/stencil). */
+        bool       clear_depth_stencil = false;
+        ClearValue clear{};
     };
 
 } // namespace rover

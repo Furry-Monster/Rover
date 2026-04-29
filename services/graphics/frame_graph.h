@@ -56,7 +56,10 @@ namespace rover
 
         // Convenience: marks the pass's color attachment + clear value. Must be
         // called from inside `setup` or before `execute()`.
-        void set_color_attachment(u32 pass_index, RenderResourceId target, const ClearValue& clear);
+        void set_color_attachment(u32               pass_index,
+                                  RenderResourceId  target,
+                                  const ClearValue& clear,
+                                  bool              clear_depth_stencil = false);
 
         // ---- Compile / execute ----
 

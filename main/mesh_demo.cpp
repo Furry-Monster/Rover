@@ -73,6 +73,7 @@ namespace rover
             BindGroupHandle                                      camera_bg       = INVALID_HANDLE;
             TextureGpuHandles                                    albedo_texture;
             MeshComponent                                        cube_mesh;
+            TextureHandle                                        depth_texture = INVALID_HANDLE;
             std::unordered_map<TextureHandle, FramebufferHandle> framebuffers;
             u32                                                  fb_width  = 0;
             u32                                                  fb_height = 0;
@@ -80,7 +81,7 @@ namespace rover
 
         bool create_static_resources(GraphicsDevice& device, DemoResources& d)
         {
-            // ---- Render pass (color only, no depth for Phase 2 demo) ----
+            // ---- Render pass: swapchain color + depth ----
             RenderPassDesc      rp_desc{};
             ColorAttachmentDesc color{};
             color.format       = device.get_swapchain_format();
@@ -88,7 +89,12 @@ namespace rover
             color.store_op     = StoreOp::Store;
             color.blend_enable = false;
             rp_desc.color_attachments.push_back(color);
-            rp_desc.has_depth_stencil = false;
+            DepthStencilAttachmentDesc ds{};
+            ds.format                 = Format::D32_SFLOAT;
+            ds.load_op                = LoadOp::Clear;
+            ds.store_op               = StoreOp::DontCare;
+            rp_desc.depth_stencil     = ds;
+            rp_desc.has_depth_stencil = true;
             rp_desc.debug_name        = "MeshDemoRenderPass";
             d.render_pass             = device.create_render_pass(rp_desc);
             if (d.render_pass == INVALID_HANDLE)
@@ -144,15 +150,17 @@ namespace rover
 
             // ---- Graphics pipeline (vertex layout matches MeshVertex) ----
             GraphicsPipelineDesc gp{};
-            gp.vertex_shader      = d.mesh_vs;
-            gp.fragment_shader    = d.mesh_fs;
-            gp.render_pass        = d.render_pass;
-            gp.pipeline_layout    = d.pipeline_layout;
-            gp.topology           = PrimitiveTopology::TriangleList;
-            gp.cull_mode          = CullMode::Back;
-            gp.front_face         = FrontFace::CounterClockwise;
-            gp.depth_test_enable  = false;
-            gp.depth_write_enable = false;
+            gp.vertex_shader   = d.mesh_vs;
+            gp.fragment_shader = d.mesh_fs;
+            gp.render_pass     = d.render_pass;
+            gp.pipeline_layout = d.pipeline_layout;
+            gp.topology        = PrimitiveTopology::TriangleList;
+            gp.cull_mode       = CullMode::Back;
+            // Negative viewport height flips NDC Y to match GLM; pairing CW fixes winding.
+            gp.front_face         = FrontFace::Clockwise;
+            gp.depth_test_enable  = true;
+            gp.depth_write_enable = true;
+            gp.depth_compare_op   = CompareOp::Less;
             gp.blend_enable       = false;
 
             VertexBinding vb{};
@@ -222,8 +230,29 @@ namespace rover
             }
             d.framebuffers.clear();
 
+            if (d.depth_texture != INVALID_HANDLE)
+            {
+                device.destroy_texture(d.depth_texture);
+                d.depth_texture = INVALID_HANDLE;
+            }
+
             d.fb_width  = device.get_swapchain_width();
             d.fb_height = device.get_swapchain_height();
+
+            if (d.fb_width > 0 && d.fb_height > 0)
+            {
+                TextureDesc depth_desc{};
+                depth_desc.width      = d.fb_width;
+                depth_desc.height     = d.fb_height;
+                depth_desc.format     = Format::D32_SFLOAT;
+                depth_desc.usage      = TextureUsage::DepthStencilAttachment;
+                depth_desc.debug_name = "MeshDemoDepth";
+                d.depth_texture       = device.create_texture(depth_desc);
+                if (d.depth_texture == INVALID_HANDLE)
+                {
+                    ROVER_LOG_ERROR("Mesh demo: failed to create depth texture");
+                }
+            }
 
             const u32 image_count = device.get_swapchain_image_count();
             for (u32 i = 0; i < image_count; ++i)
@@ -236,6 +265,7 @@ namespace rover
                 FramebufferDesc fb_desc{};
                 fb_desc.render_pass = d.render_pass;
                 fb_desc.color_attachments.push_back(tex);
+                fb_desc.depth_stencil      = d.depth_texture;
                 fb_desc.width              = d.fb_width;
                 fb_desc.height             = d.fb_height;
                 const FramebufferHandle fb = device.create_framebuffer(fb_desc);
@@ -253,6 +283,12 @@ namespace rover
                 device.destroy_framebuffer(fb);
             }
             d.framebuffers.clear();
+
+            if (d.depth_texture != INVALID_HANDLE)
+            {
+                device.destroy_texture(d.depth_texture);
+                d.depth_texture = INVALID_HANDLE;
+            }
 
             MeshUploader::destroy_buffers(device, d.cube_mesh);
             TextureUploader::destroy(device, d.albedo_texture);
@@ -435,15 +471,19 @@ namespace rover
             clear.color[1] = 0.07f;
             clear.color[2] = 0.10f;
             clear.color[3] = 1.0f;
+            clear.depth    = 1.0f;
 
             const u32 forward_idx = fg.add_pass(
                 "forward",
                 [&](PassBuilder& b) { b.write(color_id); },
                 [&](PassExecuteContext& ctx) {
                     ctx.device.cmd_bind_pipeline(ctx.cmd, demo.pipeline);
+                    // Vulkan NDC Y points down; negative viewport height matches GLM clip space.
                     Viewport vp{};
+                    vp.x      = 0.0f;
+                    vp.y      = static_cast<f32>(demo.fb_height);
                     vp.width  = static_cast<f32>(demo.fb_width);
-                    vp.height = static_cast<f32>(demo.fb_height);
+                    vp.height = -static_cast<f32>(demo.fb_height);
                     ctx.device.cmd_set_viewport(ctx.cmd, vp);
                     Scissor sc{};
                     sc.width  = demo.fb_width;
@@ -481,7 +521,7 @@ namespace rover
                         }
                     });
                 });
-            fg.set_color_attachment(forward_idx, color_id, clear);
+            fg.set_color_attachment(forward_idx, color_id, clear, true);
 
             if (!fg.compile())
             {

@@ -21,3 +21,8 @@ rover_add_library(rover_core
 )
 
 add_library(Rover::Core ALIAS rover_core)
+
+# GLM defaults follow OpenGL NDC Z in [-1, 1]; Vulkan uses [0, 1]. Without this,
+# depth testing compares nonsense values and meshes look inside-out / wrongly
+# layered despite a correct depth attachment.
+target_compile_definitions(rover_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

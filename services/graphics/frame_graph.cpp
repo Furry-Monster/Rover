@@ -96,15 +96,19 @@ namespace rover
         return idx;
     }
 
-    void FrameGraph::set_color_attachment(u32 pass_index, RenderResourceId target, const ClearValue& clear)
+    void FrameGraph::set_color_attachment(u32               pass_index,
+                                          RenderResourceId  target,
+                                          const ClearValue& clear,
+                                          bool              clear_depth_stencil)
     {
         if (pass_index >= passes_.size() || target >= resources_.size())
         {
             return;
         }
-        passes_[pass_index].framebuffer = resources_[target].framebuffer;
-        passes_[pass_index].has_clear   = true;
-        passes_[pass_index].clear       = clear;
+        passes_[pass_index].framebuffer         = resources_[target].framebuffer;
+        passes_[pass_index].has_clear           = true;
+        passes_[pass_index].clear_depth_stencil = clear_depth_stencil;
+        passes_[pass_index].clear               = clear;
     }
 
     bool FrameGraph::compile()
@@ -153,9 +157,20 @@ namespace rover
             const bool wraps_render_pass = pass.framebuffer != INVALID_HANDLE;
             if (wraps_render_pass)
             {
-                const ClearValue clears[1] = {pass.clear};
-                device.cmd_begin_render_pass(
-                    cmd, pass.framebuffer, pass.has_clear ? clears : nullptr, pass.has_clear ? 1u : 0u);
+                if (pass.has_clear && pass.clear_depth_stencil)
+                {
+                    const ClearValue clears[2] = {pass.clear, pass.clear};
+                    device.cmd_begin_render_pass(cmd, pass.framebuffer, clears, 2u);
+                }
+                else if (pass.has_clear)
+                {
+                    const ClearValue clears[1] = {pass.clear};
+                    device.cmd_begin_render_pass(cmd, pass.framebuffer, clears, 1u);
+                }
+                else
+                {
+                    device.cmd_begin_render_pass(cmd, pass.framebuffer, nullptr, 0u);
+                }
             }
 
             if (pass.execute)
