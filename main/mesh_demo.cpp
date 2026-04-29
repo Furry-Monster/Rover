@@ -156,8 +156,8 @@ namespace rover
             gp.pipeline_layout = d.pipeline_layout;
             gp.topology        = PrimitiveTopology::TriangleList;
             gp.cull_mode       = CullMode::Back;
-            // Negative viewport height flips NDC Y to match Mat4::perspective clip space; pairing CW fixes winding.
-            gp.front_face         = FrontFace::Clockwise;
+            // Perspective uses inverted Y scale for Vulkan; standard CCW front face with positive viewport height.
+            gp.front_face         = FrontFace::CounterClockwise;
             gp.depth_test_enable  = true;
             gp.depth_write_enable = true;
             gp.depth_compare_op   = CompareOp::Less;
@@ -334,7 +334,7 @@ namespace rover
             auto camera = world.create_entity();
             world.add_component<NameComponent>(camera, "MainCamera");
             auto& cam_x         = world.add_component<TransformComponent>(camera);
-            cam_x.position      = Vector3{0.0f, 1.0f, 4.0f};
+            cam_x.position      = Vector3{0.0f, 0.0f, 4.0f};
             auto& cam_c         = world.add_component<CameraComponent>(camera);
             cam_c.fov_y_radians = 1.0472f;
             cam_c.near_plane    = 0.1f;
@@ -478,12 +478,11 @@ namespace rover
                 [&](PassBuilder& b) { b.write(color_id); },
                 [&](PassExecuteContext& ctx) {
                     ctx.device.cmd_bind_pipeline(ctx.cmd, demo.pipeline);
-                    // Vulkan NDC Y points down; negative viewport height matches Mat4 perspective clip space.
                     Viewport vp{};
                     vp.x      = 0.0f;
-                    vp.y      = static_cast<f32>(demo.fb_height);
+                    vp.y      = 0.0f;
                     vp.width  = static_cast<f32>(demo.fb_width);
-                    vp.height = -static_cast<f32>(demo.fb_height);
+                    vp.height = static_cast<f32>(demo.fb_height);
                     ctx.device.cmd_set_viewport(ctx.cmd, vp);
                     Scissor sc{};
                     sc.width  = demo.fb_width;

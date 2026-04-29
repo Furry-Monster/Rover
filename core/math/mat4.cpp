@@ -127,7 +127,8 @@ namespace rover
         const f32 tan_half = std::tan(fovy * 0.5f);
         Mat4      out{};
         out.c[0][0] = 1.0f / (aspect * tan_half);
-        out.c[1][1] = 1.0f / tan_half;
+        // Flip Y for Vulkan clip/NDC (Y down); pair with a non-negative viewport height.
+        out.c[1][1] = -1.0f / tan_half;
         out.c[2][2] = z_far / (z_near - z_far);
         out.c[2][3] = -1.0f;
         out.c[3][2] = (z_far * z_near) / (z_near - z_far);
