@@ -100,9 +100,23 @@ namespace rover
             return m;
         }
 
-        /** Vertical field of view in radians; clip-space Z in [0,1] for Vulkan. */
+        /**
+         * Perspective for the engine's canonical clip space (targets the same NDC
+         * convention as Vulkan, Metal, D3D12: Z in [0,1], Y flipped vs classic
+         * OpenGL so that a normal full-frame viewport with positive height yields
+         * the expected image). Shaders and `GraphicsDevice` implementations for
+         * those APIs should use this matrix as-is. A legacy OpenGL-style backend
+         * should apply a small clip correction (e.g. extra uniform, or
+         * `glClipControl` + matching viewport) rather than forking these factories
+         * per API inside core/math.
+         */
         [[nodiscard]] static Mat4 perspective(f32 fovy, f32 aspect, f32 z_near, f32 z_far) noexcept;
 
+        /**
+         * Orthographic projection; depth mapping matches `perspective` (canonical
+         * / modern-API Z in [0, 1]). Y axis matches `perspective` only if used with
+         * the same viewport convention as the active backend.
+         */
         [[nodiscard]] static Mat4 ortho(f32 left, f32 right, f32 bottom, f32 top, f32 z_near, f32 z_far) noexcept;
 
         [[nodiscard]] static Mat4 look_at(const Vector3& eye, const Vector3& center, const Vector3& up) noexcept;

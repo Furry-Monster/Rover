@@ -156,7 +156,7 @@ namespace rover
             gp.pipeline_layout = d.pipeline_layout;
             gp.topology        = PrimitiveTopology::TriangleList;
             gp.cull_mode       = CullMode::Back;
-            // Perspective uses inverted Y scale for Vulkan; standard CCW front face with positive viewport height.
+            // Matches Mat4::perspective canonical clip (positive viewport height, CCW front).
             gp.front_face         = FrontFace::CounterClockwise;
             gp.depth_test_enable  = true;
             gp.depth_write_enable = true;
