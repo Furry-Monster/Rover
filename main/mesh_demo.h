@@ -1,5 +1,9 @@
 #pragma once
 
+#include "core/typedefs.h"
+
+#include <string>
+
 namespace rover
 {
 
@@ -8,9 +12,14 @@ namespace rover
     class EventPump;
     class TimeSource;
 
-    // Phase 2 exit-condition demo: loads / builds an ECS scene with a camera, a
-    // directional light, and one cube mesh, then renders via the FrameGraph in a
-    // loop. Returns the process exit code.
-    int run_mesh_demo(GraphicsDevice& device, Window& window, EventPump& pump, TimeSource& time);
+    // Loads a persistent ECS scene and resolves its built-in mesh resources.
+    // A missing scene file is initialized with a camera, light and cube. Existing
+    // files are preserved. frame_limit == 0 runs until the window closes.
+    int run_mesh_demo(GraphicsDevice&    device,
+                      Window&            window,
+                      EventPump&         pump,
+                      TimeSource&        time,
+                      const std::string& scene_path,
+                      u32                frame_limit = 0);
 
 } // namespace rover

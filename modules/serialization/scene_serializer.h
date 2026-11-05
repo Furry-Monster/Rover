@@ -20,8 +20,7 @@ namespace rover
     //   - TransformComponent
     //   - CameraComponent
     //   - LightComponent
-    //   - MeshComponent (handles only; Sprint 2.6's loader is responsible for
-    //     re-resolving GPU handles after deserialization)
+    //   - MeshComponent (stable mesh_asset path; GPU handles are never stored)
     //   - ParentComponent / ChildrenComponent
     //
     // Custom user components will be wired through `ClassDB::list_properties`
@@ -37,7 +36,8 @@ namespace rover
         // to `serialize(world, json)` -> parse(json), but skips the round-trip.
         [[nodiscard]] static Variant to_variant(World& world);
 
-        // Convenience: re-create entities + components from a Variant tree.
+        // Replaces the destination only on success. Unsupported versions, invalid
+        // component shapes or cyclic parent links fail without changing it.
         static bool from_variant(const Variant& tree, World& out);
 
         // ---- File-level shortcuts (use core/os/file_access for IO) ----

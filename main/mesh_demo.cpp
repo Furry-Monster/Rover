@@ -12,9 +12,10 @@
 #include "modules/scene/components/mesh_component.h"
 #include "modules/scene/components/name_component.h"
 #include "modules/scene/components/transform_component.h"
+#include "modules/scene/scene_tree.h"
 #include "modules/scene/world.h"
-#include "modules/serialization/mesh_uploader.h"
-#include "modules/serialization/primitive_meshes.h"
+#include "modules/serialization/mesh_asset_cache.h"
+#include "modules/serialization/mesh_data.h"
 #include "modules/serialization/scene_serializer.h"
 #include "modules/serialization/texture_data.h"
 #include "modules/serialization/texture_uploader.h"
@@ -28,7 +29,6 @@
 #include "shaders/mesh_vert.spv.h"
 
 #include <cstring>
-#include <filesystem>
 #include <unordered_map>
 #include <vector>
 
@@ -72,7 +72,6 @@ namespace rover
             BufferHandle                                         camera_ubo      = INVALID_HANDLE;
             BindGroupHandle                                      camera_bg       = INVALID_HANDLE;
             TextureGpuHandles                                    albedo_texture;
-            MeshComponent                                        cube_mesh;
             TextureHandle                                        depth_texture = INVALID_HANDLE;
             std::unordered_map<TextureHandle, FramebufferHandle> framebuffers;
             u32                                                  fb_width  = 0;
@@ -211,14 +210,6 @@ namespace rover
             auto checker     = make_checkerboard(64, 64, 8, 220, 220, 220, 80, 80, 80);
             d.albedo_texture = TextureUploader::upload(device, checker, "demo_checker");
 
-            // ---- Cube mesh (CPU -> GPU upload through MeshUploader) ----
-            auto cube_data = make_cube(1.0f);
-            d.cube_mesh    = MeshUploader::upload(device, cube_data, "DemoCube");
-            if (d.cube_mesh.vertex_buffer == INVALID_HANDLE)
-            {
-                return false;
-            }
-
             return true;
         }
 
@@ -290,7 +281,6 @@ namespace rover
                 d.depth_texture = INVALID_HANDLE;
             }
 
-            MeshUploader::destroy_buffers(device, d.cube_mesh);
             TextureUploader::destroy(device, d.albedo_texture);
             if (d.camera_bg != INVALID_HANDLE)
             {
@@ -352,12 +342,17 @@ namespace rover
             auto mesh_e = world.create_entity();
             world.add_component<NameComponent>(mesh_e, "Cube");
             world.add_component<TransformComponent>(mesh_e);
-            world.add_component<MeshComponent>(mesh_e);
+            world.add_component<MeshComponent>(mesh_e).mesh_asset = "builtin://meshes/cube";
         }
 
     } // namespace
 
-    int run_mesh_demo(GraphicsDevice& device, Window& window, EventPump& pump, TimeSource& time)
+    int run_mesh_demo(GraphicsDevice&    device,
+                      Window&            window,
+                      EventPump&         pump,
+                      TimeSource&        time,
+                      const std::string& scene_path,
+                      u32                frame_limit)
     {
         DemoResources demo{};
         if (!create_static_resources(device, demo))
@@ -368,30 +363,35 @@ namespace rover
         }
         rebuild_framebuffers(device, demo);
 
-        // Build / save / load the scene to validate the serialization round-trip
-        // (Phase 2 exit condition).
-        World world;
-        build_default_scene(world);
-
-        const std::string scene_path = (std::filesystem::temp_directory_path() / "rover_phase2_scene.rscene").string();
-        if (SceneSerializer::save_json(world, scene_path))
+        auto directory = DirAccess::create();
+        if (!directory)
         {
-            ROVER_LOG_INFO("Demo scene saved to {}", scene_path);
-            World loaded;
-            if (SceneSerializer::load_json(scene_path, loaded))
+            ROVER_LOG_ERROR("Mesh demo requires a registered filesystem");
+            destroy_demo(device, demo);
+            return 1;
+        }
+        if (!directory->file_exists(scene_path))
+        {
+            World initial;
+            build_default_scene(initial);
+            if (!SceneSerializer::save_json(initial, scene_path))
             {
-                ROVER_LOG_INFO("Demo scene round-tripped through JSON ({} entities)", loaded.entity_count());
+                ROVER_LOG_ERROR("Failed to create demo scene '{}'", scene_path);
+                destroy_demo(device, demo);
+                return 1;
             }
+            ROVER_LOG_INFO("Created demo scene '{}'", scene_path);
         }
 
-        // Resolve mesh handles on the live World (the serialized world clears
-        // GPU handles, so we re-attach the cube_mesh to the live entity).
-        auto cube_view = world.view<MeshComponent>();
-        for (auto e : cube_view)
+        World          world;
+        MeshAssetCache meshes(device);
+        if (!SceneSerializer::load_json(scene_path, world) || !meshes.resolve(world))
         {
-            auto& mc = world.registry().get<MeshComponent>(e);
-            mc       = demo.cube_mesh;
+            ROVER_LOG_ERROR("Failed to load scene '{}'", scene_path);
+            destroy_demo(device, demo);
+            return 1;
         }
+        ROVER_LOG_INFO("Loaded scene '{}' ({} entities)", scene_path, world.entity_count());
 
         // ---- Bind device into GraphicsService for the frame loop ----
         auto& service = GraphicsService::get();
@@ -399,7 +399,8 @@ namespace rover
 
         ROVER_LOG_INFO("Mesh demo ready; entering main loop");
 
-        while (!window.should_close())
+        u32 rendered_frames = 0;
+        while (!window.should_close() && (frame_limit == 0 || rendered_frames < frame_limit))
         {
             pump.poll();
             time.tick();
@@ -423,7 +424,7 @@ namespace rover
             f32  aspect = static_cast<f32>(demo.fb_width) / static_cast<f32>(demo.fb_height == 0 ? 1 : demo.fb_height);
             Mat4 proj_mat  = Mat4::perspective(1.0472f, aspect, 0.1f, 100.0f);
             bool found_cam = false;
-            world.each<CameraComponent, TransformComponent>([&](auto, CameraComponent& cc, TransformComponent& tc) {
+            world.each<CameraComponent, TransformComponent>([&](auto entity, CameraComponent& cc, TransformComponent&) {
                 if (!cc.primary || found_cam)
                 {
                     return;
@@ -431,7 +432,7 @@ namespace rover
                 found_cam       = true;
                 cc.aspect_ratio = aspect;
                 proj_mat        = cc.projection_matrix();
-                view_mat        = tc.as_transform3d().inverse().to_mat4();
+                view_mat        = SceneTree::world_matrix(world, entity).inverse();
             });
             ubo.view       = view_mat;
             ubo.projection = proj_mat;
@@ -490,35 +491,36 @@ namespace rover
                     ctx.device.cmd_set_scissor(ctx.cmd, sc);
                     ctx.device.cmd_bind_group(ctx.cmd, 0, demo.camera_bg);
 
-                    world.each<TransformComponent, MeshComponent>([&](auto, TransformComponent& tc, MeshComponent& mc) {
-                        if (mc.vertex_buffer == INVALID_HANDLE)
-                        {
-                            return;
-                        }
-                        MeshPushConstants pcdata{};
-                        pcdata.world       = tc.to_mat4();
-                        pcdata.light_dir   = Vector4{light_dir.x(), light_dir.y(), light_dir.z(), 0.0f};
-                        pcdata.light_color = Vector4{light_color.x() * light_intensity,
-                                                     light_color.y() * light_intensity,
-                                                     light_color.z() * light_intensity,
-                                                     0.15f};
-                        pcdata.albedo      = Vector4{0.85f, 0.65f, 0.4f, 1.0f};
-                        ctx.device.cmd_push_constants(ctx.cmd,
-                                                      demo.pipeline_layout,
-                                                      ShaderStage::Vertex | ShaderStage::Fragment,
-                                                      &pcdata,
-                                                      sizeof(pcdata));
-                        ctx.device.cmd_bind_vertex_buffer(ctx.cmd, mc.vertex_buffer, 0, 0);
-                        if (mc.index_buffer != INVALID_HANDLE)
-                        {
-                            ctx.device.cmd_bind_index_buffer(ctx.cmd, mc.index_buffer, mc.index_type, 0);
-                            ctx.device.cmd_draw_indexed(ctx.cmd, mc.index_count, 1, 0, 0, 0);
-                        }
-                        else
-                        {
-                            ctx.device.cmd_draw(ctx.cmd, mc.vertex_count, 1, 0, 0);
-                        }
-                    });
+                    world.each<TransformComponent, MeshComponent>(
+                        [&](auto entity, TransformComponent&, MeshComponent& mc) {
+                            if (mc.vertex_buffer == INVALID_HANDLE)
+                            {
+                                return;
+                            }
+                            MeshPushConstants pcdata{};
+                            pcdata.world       = SceneTree::world_matrix(world, entity);
+                            pcdata.light_dir   = Vector4{light_dir.x(), light_dir.y(), light_dir.z(), 0.0f};
+                            pcdata.light_color = Vector4{light_color.x() * light_intensity,
+                                                         light_color.y() * light_intensity,
+                                                         light_color.z() * light_intensity,
+                                                         0.15f};
+                            pcdata.albedo      = Vector4{0.85f, 0.65f, 0.4f, 1.0f};
+                            ctx.device.cmd_push_constants(ctx.cmd,
+                                                          demo.pipeline_layout,
+                                                          ShaderStage::Vertex | ShaderStage::Fragment,
+                                                          &pcdata,
+                                                          sizeof(pcdata));
+                            ctx.device.cmd_bind_vertex_buffer(ctx.cmd, mc.vertex_buffer, 0, 0);
+                            if (mc.index_buffer != INVALID_HANDLE)
+                            {
+                                ctx.device.cmd_bind_index_buffer(ctx.cmd, mc.index_buffer, mc.index_type, 0);
+                                ctx.device.cmd_draw_indexed(ctx.cmd, mc.index_count, 1, 0, 0, 0);
+                            }
+                            else
+                            {
+                                ctx.device.cmd_draw(ctx.cmd, mc.vertex_count, 1, 0, 0);
+                            }
+                        });
                 });
             fg.set_color_attachment(forward_idx, color_id, clear, true);
 
@@ -533,11 +535,13 @@ namespace rover
 
             device.end_frame();
             device.present();
+            ++rendered_frames;
         }
 
-        ROVER_LOG_INFO("Main loop exited; tearing down mesh demo resources");
+        ROVER_LOG_INFO("Rendered {} frames from '{}'; tearing down mesh demo resources", rendered_frames, scene_path);
         device.wait_idle();
         destroy_demo(device, demo);
+        meshes.clear();
         service.unbind_device();
         return 0;
     }

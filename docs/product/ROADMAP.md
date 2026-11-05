@@ -9,7 +9,7 @@
 | 版本 | 主题 | 状态 | 完成时间 |
 |------|------|------|---------|
 | **v0.1.0** | Phase 1 — 核心系统 + Vulkan 三角形 | ✅ Done | 2026-04 |
-| **v0.2.0** | Phase 2 — Frame Graph + ECS 场景 + 资源管线 | 🚧 Planned | — |
+| **v0.2.0** | Phase 2 — Frame Graph + ECS 场景 + 资源管线 | 🚧 In progress | — |
 | **v0.3.0** | Phase 3 — 编辑器 GUI/CLI + Asset Browser | ⏳ Planned | — |
 | **v0.4.0** | Phase 4 — 物理 / 音频 / 网络服务 | ⏳ Planned | — |
 | **v0.5.0** | Phase 5 — 跨平台铺开（Windows / macOS） | ⏳ Planned | — |
@@ -79,18 +79,21 @@
 - ✅ misc/cmake：构建模块（Options / Compiler / Utils / Shader）
 - ✅ docs：架构 + 各子系统权威文档
 
-### Phase 2 — v0.2 (🚧 Planned)
+### Phase 2 — v0.2 (🚧 In progress)
 
 **目标**：把渲染从 demo 升级为可持续演进的生产路线，并建立 ECS 场景。
 
 里程碑：
-- 🎯 `services/graphics/`：Frame Graph 抽象（render passes 串成 DAG，自动 barrier）
-- 🎯 `modules/scene/`：EnTT World 包装、`Entity` / `Component` 反射（基于 `core/object/`）
-- 🎯 `modules/serialization/`：基础二进制 + 文本（json）格式 + Asset 注册表
-- 🎯 `core/io/`：文件系统抽象 + Linux 实现（VFS 层简化为原生路径）
-- 🎯 `core/variant/`：填充 Variant 实现（v0.1 仅占位）
-- 🎯 渲染端：descriptor set / push constant / staging buffer 上传 / `update_texture` 完整实现
-- 🎯 在 Frame Graph 之上跑一个简单的「立方体 + 相机」demo
+- ✅ `services/graphics/`：Frame Graph 基础抽象（导入资源、声明顺序执行、render-pass 封装）
+- 🎯 Frame Graph 依赖 DAG 与跨 pass 自动 barrier（当前未实现）
+- ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
+- ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
+- ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）
+- ✅ `core/variant/`：Variant + Callable
+- ✅ 渲染端：BindGroup / push constant / staging 上传 / `update_texture`
+- ✅ ECS 立方体 + 相机 + 平行光 demo，支持深度缓冲
+- ✅ 场景加载闭环：version 2 保存稳定网格路径，重启恢复 GPU 缓冲；`--scene` 文件仅首次创建，渲染实际加载的 World（[ADR-0011](adr/ADR-0011-scene-mesh-resource-paths.md)）
+- 🎯 外部资产导入、材质/纹理持久引用、磁盘资产注册表：Phase 3
 
 退出条件：能用 ECS 描述一个 3D 场景，序列化到磁盘 / 加载回来，跑出至少 1 个 mesh + 1 个 light 的画面。
 
@@ -180,7 +183,7 @@
 
 待规划的 ADR（按 phase 触发）：
 
-- **Phase 2**：Variant 实现策略（手写 vs `std::variant` vs SBO）、Asset Pipeline 总体架构
+- **Phase 2**：Variant 策略已记录 ADR-0009，场景网格路径已记录 ADR-0011；完整 Asset Pipeline 总体架构随 Phase 3 推进
 - **Phase 4**：物理引擎选型（Jolt vs Bullet vs PhysX）、音频引擎选型
 - **Phase 6**：第二渲染后端选型（D3D12 vs Metal 优先）
 

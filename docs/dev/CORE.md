@@ -81,7 +81,7 @@ core/
 │
 ├── task/
 │   ├── thread_safe_queue.h             线程安全 MPMC 队列
-│   ├── work_stealing_queue.h           Chase-Lev 工作窃取双端队列
+│   ├── work_stealing_queue.h           互斥保护的有界工作窃取双端队列
 │   ├── job_handle.h                    Job 完成句柄
 │   ├── job_system.{h,cpp}             JobSystem 主类
 │   └── task.h                          伞形头文件
@@ -514,22 +514,23 @@ class ThreadSafeQueue {
 
 ### 8.3 WorkStealingQueue — `work_stealing_queue.h`
 
-**Chase-Lev 工作窃取双端队列**：
+**互斥保护的有界工作窃取双端队列**：所有者 LIFO pop，其他 worker FIFO steal。所有槽位读写在同一个互斥锁内完成，避免 `std::function` 在 pop 与 steal 竞争时同时被移动/读取。`try_push(T&)` 在满队列时返回 false 并保留参数，JobSystem 将其放入全局队列，保证已计数的任务不会丢失。
 
 ```cpp
 template<typename T>
 class WorkStealingQueue {
     explicit WorkStealingQueue(usize capacity);  // 必须是 2 的幂
 
-    void push(T item);          // 所有者线程：推入 bottom（LIFO，缓存热）
+    bool push(T item);          // 按值推入，满时返回 false
+    bool try_push(T& item);     // 仅在成功时移动参数，支持溢出回退
     bool try_pop(T& out);       // 所有者线程：从 bottom 弹出
     bool try_steal(T& out);     // 任意线程：从 top 窃取（FIFO）
 };
 ```
 
-- 使用 `std::atomic<i64>` 的 top/bottom 索引
-- 固定容量 ring buffer（2 的幂 + 位掩码）
-- 内存序：push 使用 release fence，steal 使用 acquire + seq_cst CAS
+- 固定容量 ring buffer（2 的幂 + 位掩码），`std::mutex` 保护索引与槽位
+- pop 与 steal 仅有一个线程取得任务所有权；不在所有权确定前移动任务
+- 同步策略与性能取舍见 [ADR-0012](../product/adr/ADR-0012-task-queue-synchronization.md)
 
 ### 8.4 JobHandle — `job_handle.h`
 
@@ -566,8 +567,8 @@ class JobSystem {
 ### 8.6 调度策略
 
 **submit 路由**：
-1. 如果调用者是 worker 线程 → 推入本地 `WorkStealingQueue`
-2. 否则 → 推入全局 `ThreadSafeQueue`
+1. 如果调用者是 worker 线程 → 尝试推入本地 `WorkStealingQueue`
+2. 本地队列满或来自外部线程 → 推入全局 `ThreadSafeQueue`
 
 **worker 循环优先级**：
 1. 自己的本地队列（`try_pop`，LIFO，缓存热）
@@ -1014,7 +1015,7 @@ ref_counted.h       ← 依赖 object.h
 | `Signal` | **否** | emit 期间禁止 connect/disconnect |
 | `EventBus` | **否** | 调用者需同步 |
 | `ThreadSafeQueue` | 是 | mutex + condition_variable |
-| `WorkStealingQueue` | 部分 | push/pop 仅限所有者线程；steal 任意线程 |
+| `WorkStealingQueue` | 是 | mutex 保护槽位；所有者 LIFO pop，其他 worker FIFO steal |
 | `JobSystem` | 是 | submit/wait 可从任意线程调用 |
 | `JobHandle` | 是 | 原子 bool |
 | `Object::instance_id` | 是 | 原子自增 |

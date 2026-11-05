@@ -10,6 +10,7 @@
 #include <doctest/doctest.h>
 
 #include <atomic>
+#include <barrier>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -102,6 +103,92 @@ TEST_CASE("JobSystem: worker_count uses provided thread_count")
     CHECK(js.worker_count() == 2);
     js.init();
     js.shutdown();
+}
+
+TEST_CASE("WorkStealingQueue: overflow preserves the task for fallback")
+{
+    WorkStealingQueue<Job> queue{2};
+    int                    executed = 0;
+    REQUIRE(queue.push([&] { executed += 1; }));
+    REQUIRE(queue.push([&] { executed += 10; }));
+    Job overflow = [&] {
+        executed += 100;
+    };
+    CHECK_FALSE(queue.try_push(overflow));
+    REQUIRE(static_cast<bool>(overflow));
+    overflow();
+    Job task;
+    REQUIRE(queue.try_pop(task));
+    task();
+    CHECK(executed == 110);
+    REQUIRE(queue.try_steal(task));
+    task();
+    CHECK(executed == 111);
+    CHECK_FALSE(queue.try_pop(task));
+    CHECK_FALSE(queue.try_steal(task));
+}
+
+TEST_CASE("WorkStealingQueue: owner and thief consume each task exactly once")
+{
+    WorkStealingQueue<Job> queue{1};
+    constexpr int          rounds = 1000;
+    std::barrier           sync{2};
+    std::atomic<int>       executed{0};
+    std::atomic<int>       empty_tasks{0};
+    auto                   run = [&](Job& task) {
+        if (task)
+        {
+            task();
+        }
+        else
+        {
+            ++empty_tasks;
+        }
+    };
+    std::jthread thief([&] {
+        for (int i = 0; i < rounds; ++i)
+        {
+            sync.arrive_and_wait();
+            Job task;
+            if (queue.try_steal(task))
+            {
+                run(task);
+            }
+            sync.arrive_and_wait();
+        }
+    });
+    for (int i = 0; i < rounds; ++i)
+    {
+        // Both consumers finished the previous round, so this slot is empty.
+        queue.push([&] { ++executed; });
+        sync.arrive_and_wait();
+        Job task;
+        if (queue.try_pop(task))
+        {
+            run(task);
+        }
+        sync.arrive_and_wait();
+    }
+    thief.join();
+    CHECK(executed == rounds);
+    CHECK(empty_tasks == 0);
+}
+
+TEST_CASE("JobSystem: nested submissions beyond local capacity all complete")
+{
+    JobSystem system{1};
+    system.init();
+    std::atomic<int> completed{0};
+    constexpr int    jobs = 2048;
+    system.submit([&] {
+        for (int i = 0; i < jobs; ++i)
+        {
+            system.submit([&] { ++completed; });
+        }
+    });
+    system.wait_all();
+    CHECK(completed == jobs);
+    system.shutdown();
 }
 
 TEST_CASE("JobSystem: every submitted job runs exactly once")

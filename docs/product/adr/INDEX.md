@@ -18,6 +18,8 @@
 | [ADR-0008](ADR-0008-vendor-manual-fetch.md) | vendor 第三方依赖统一手动下载（禁用 submodule / FetchContent / find_package） | Accepted | 2026-04-29 |
 | [ADR-0009](ADR-0009-variant-implementation-strategy.md) | Variant 实现策略：手写 union + tag + 64B inline 缓冲区 | Accepted | 2026-04-29 |
 | [ADR-0010](ADR-0010-graphics-bind-group-design.md) | GraphicsDevice 描述符绑定：WebGPU 风格 BindGroup | Accepted | 2026-04-29 |
+| [ADR-0011](ADR-0011-scene-mesh-resource-paths.md) | 场景持久化稳定网格路径与 GPU 资源恢复 | Accepted | 2026-11-05 |
+| [ADR-0012](ADR-0012-task-queue-synchronization.md) | 互斥保护任务队列所有权与溢出回退 | Accepted | 2026-11-05 |
 
 ---
 

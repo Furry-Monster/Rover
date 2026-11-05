@@ -13,6 +13,7 @@
 | 知道应该怎么写代码（命名、风格、约束） | [`standard/`](standard/) |
 | 第一次接触引擎，不知道从哪开始 | 先 [`dev/ARCHITECTURE.md`](dev/ARCHITECTURE.md)，再 [`product/ROADMAP.md`](product/ROADMAP.md) |
 | 查某个已记录渲染/引擎缺陷的调查结论 | [`debug/`](debug/) |
+| 运行持久化场景、修改后重启加载 | [`dev/SCENE_LOADING.md`](dev/SCENE_LOADING.md) |
 | 提交 PR 前自查 | [`standard/CODE_STYLE.md`](standard/CODE_STYLE.md) + [`standard/ARCHITECTURE_RULES.md`](standard/ARCHITECTURE_RULES.md) + [`standard/TESTING.md`](standard/TESTING.md) |
 | 新增一个渲染后端 / 平台 / 模块 | [`product/ROADMAP.md`](product/ROADMAP.md) 看支持矩阵 → [`dev/`](dev/) 看现有实现模板 → [`product/adr/`](product/adr/) 写决策 |
 

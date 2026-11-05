@@ -15,7 +15,18 @@ namespace rover
         pos_  = 0;
         root_ = Variant{};
         skip_whitespace();
-        return parse_value(root_);
+        if (!parse_value(root_))
+        {
+            root_ = Variant{};
+            return false;
+        }
+        skip_whitespace();
+        if (pos_ != src_->size())
+        {
+            root_ = Variant{};
+            return false;
+        }
+        return true;
     }
 
     char JsonDeserializer::peek() const

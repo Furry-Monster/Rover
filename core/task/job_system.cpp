@@ -53,14 +53,11 @@ namespace rover
     {
         jobs_in_flight_.fetch_add(1, std::memory_order_relaxed);
 
-        if (t_worker_index < thread_count_)
+        if (t_worker_index < thread_count_ && local_queues_[t_worker_index]->try_push(job))
         {
-            local_queues_[t_worker_index]->push(std::move(job));
+            return;
         }
-        else
-        {
-            global_queue_.push(std::move(job));
-        }
+        global_queue_.push(std::move(job));
     }
 
     JobHandle JobSystem::submit_with_handle(Job job)

@@ -31,7 +31,10 @@
 #include "shaders/triangle_frag.spv.h"
 #include "shaders/triangle_vert.spv.h"
 
+#include <charconv>
+#include <cstdio>
 #include <cstring>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -231,7 +234,7 @@ namespace rover
     // ---------------------------------------------------------------------------
     // Top-level dispatcher: parses --demo and routes to the chosen demo.
     // ---------------------------------------------------------------------------
-    static int run_main_loop(std::string_view demo_name)
+    static int run_main_loop(std::string_view demo_name, const std::string& scene_path, u32 frame_limit)
     {
         auto& platform = LinuxPlatform::get();
         if (!platform.initialized())
@@ -269,7 +272,7 @@ namespace rover
         }
         else
         {
-            rc = run_mesh_demo(*device, window, pump, time);
+            rc = run_mesh_demo(*device, window, pump, time, scene_path, frame_limit);
         }
         device->shutdown();
         return rc;
@@ -277,6 +280,59 @@ namespace rover
 
     static int rover_main(int argc, char** argv)
     {
+        std::string_view demo_name   = "mesh";
+        std::string      scene_path  = "demo.rscene";
+        u32              frame_limit = 0;
+        for (int i = 1; i < argc; ++i)
+        {
+            const std::string_view arg = argv[i];
+            if (arg == "--help")
+            {
+                std::puts("Usage: rover [--demo mesh|triangle] [--scene path] [--frames positive-count]\n"
+                          "Mesh demo creates the scene only when missing, then loads it for rendering.\n"
+                          "Default scene: demo.rscene. --frames applies to the mesh demo.");
+                return 0;
+            }
+            if ((arg != "--demo" && arg != "--scene" && arg != "--frames") || i + 1 >= argc)
+            {
+                std::fprintf(stderr, "Unknown option or missing value: %s\n", argv[i]);
+                return 1;
+            }
+            const std::string_view value = argv[++i];
+            if (arg == "--demo")
+            {
+                if (value != "mesh" && value != "triangle")
+                {
+                    std::fprintf(stderr, "Unknown demo: %s\n", argv[i]);
+                    return 1;
+                }
+                demo_name = value;
+            }
+            else if (arg == "--scene")
+            {
+                if (value.empty() || value.starts_with("--"))
+                {
+                    std::fputs("--scene requires a file path\n", stderr);
+                    return 1;
+                }
+                scene_path = value;
+            }
+            else
+            {
+                const auto result = std::from_chars(value.data(), value.data() + value.size(), frame_limit);
+                if (result.ec != std::errc{} || result.ptr != value.data() + value.size() || frame_limit == 0)
+                {
+                    std::fputs("--frames requires a positive integer\n", stderr);
+                    return 1;
+                }
+            }
+        }
+        if (demo_name == "triangle" && frame_limit != 0)
+        {
+            std::fputs("--frames is supported by the mesh demo only\n", stderr);
+            return 1;
+        }
+
         register_core_types();
 
         ROVER_LOG_INFO("{} {}", ROVER_VERSION_NAME, ROVER_VERSION_STRING);
@@ -289,17 +345,7 @@ namespace rover
         register_editor_types();
 #endif
 
-        // Argument parsing: only --demo <triangle|mesh> for now.
-        std::string_view demo_name = "mesh";
-        for (int i = 1; i + 1 < argc; ++i)
-        {
-            if (std::strcmp(argv[i], "--demo") == 0)
-            {
-                demo_name = argv[i + 1];
-            }
-        }
-
-        const int exit_code = run_main_loop(demo_name);
+        const int exit_code = run_main_loop(demo_name, scene_path, frame_limit);
 
 #ifdef ROVER_EDITOR_BUILD
         unregister_editor_types();

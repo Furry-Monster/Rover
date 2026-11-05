@@ -525,7 +525,7 @@ TEST_CASE("Vector3 dot product") {
 - [x] **core/object/**：实现 `Object` 基类、`ClassDB`、`RefCounted`、`ROVER_CLASS` 宏
 - [x] **core/math/**：实现 `Vector{2,3,4}`、`Mat4`、`Quat`、`AABB`、`Transform3D`
 - [x] **core/allocator/**：实现 `LinearAllocator`、`PoolAllocator`、`ArenaAllocator`
-- [x] **core/task/**：基于 `std::jthread` + 工作窃取队列的 Job system
+- [x] **core/task/**：基于 `std::jthread` + 工作窃取队列的 Job system；本地队列以 mutex 保护任务所有权，满时回退全局队列（[ADR-0012](../product/adr/ADR-0012-task-queue-synchronization.md)）
 - [x] **core/event/**：`Delegate`、`Signal`、`EventBus`
 - [x] **core/log/**：spdlog 封装的双通道日志系统
 - [x] **core/graphics/graphics_device.h**：GraphicsDevice 抽象（缓冲、纹理、管线、命令）
@@ -543,11 +543,12 @@ TEST_CASE("Vector3 dot product") {
 - [x] **core/object/**：ClassDB 增强 (`register_property` + `PropertyInfo` getter/setter)
 - [x] **core/graphics/**：BindGroupLayout / BindGroup / PipelineLayout / push constants 抽象
 - [x] **drivers/vulkan/**：descriptor pool、staging buffer 自动上传、`update_texture` 完整实现
-- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph` (pass DAG + auto-cmd-list)
+- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源 + 声明顺序执行 + auto-cmd-list；依赖 DAG 与自动 barrier 尚待实现）
 - [x] **modules/scene/**：EnTT 4 `World` 包装、Entity handle、内置 components（Transform/Mesh/Camera/Light/Name/Hierarchy）+ SceneTree 父子链
 - [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
 - [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）
 - [x] **main/mesh_demo**：ECS 立方体 + 相机 + 平行光 demo，FrameGraph 驱动
+- [x] **Phase 2 场景加载闭环**（[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)）：场景 version 2 持久化 `MeshComponent::mesh_asset` 路径，运行时句柄不落盘；serialization 模块中的 `MeshAssetCache` 通过 `GraphicsDevice` 恢复并共享 cube / quad / sphere 缓冲。缓存独占 GPU 缓冲，组件借用句柄，缓存销毁早于设备关闭。加载成功替换目标 World，失败保留原 World；JSON 组件恢复向量与四元数字典。demo 的 `--scene` 文件只在不存在时初始化，渲染实际加载的 World。
 - [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser（Phase 3）
 - [ ] **editor/cli/**：命令解析、暴露 `import / export / build`（Phase 3）
 - [ ] **tests/services & drivers/**：`GraphicsDevice` mock 已落地 ([tests/services/frame_graph_test.cpp](../../tests/services/frame_graph_test.cpp))；穿过 driver 层的集成测试推迟到有 headless GPU CI
@@ -566,6 +567,8 @@ TEST_CASE("Vector3 dot product") {
 - [docs/standard/ARCHITECTURE_RULES.md](../standard/ARCHITECTURE_RULES.md) — 必须遵守的层依赖与 include 约束
 
 ---
+
+场景格式、加载流程与运行示例见 [SCENE_LOADING.md](SCENE_LOADING.md)。
 
 ## 14. 参考资料
 

@@ -1,6 +1,7 @@
 #include "modules/serialization/json_serializer.h"
 
 #include <cstdio>
+#include <limits>
 
 namespace rover
 {
@@ -203,7 +204,7 @@ namespace rover
     {
         maybe_separator();
         char buf[32];
-        std::snprintf(buf, sizeof(buf), "%g", v);
+        std::snprintf(buf, sizeof(buf), "%.*g", std::numeric_limits<f64>::max_digits10, v);
         out_ << buf;
     }
 

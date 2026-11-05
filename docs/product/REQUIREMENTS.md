@@ -97,7 +97,8 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-403 | particle 模块（CPU + GPU 粒子） | Accepted | v0.3+ | modules/particle/ |
 | F-404 | ui 模块（布局、控件、主题） | Accepted | v0.3 | modules/ui/ |
 | F-405 | ai 模块（导航、行为树、黑板） | Accepted | v0.4 | modules/ai/ |
-| F-406 | serialization 模块（资产格式、import/export） | Accepted | v0.2 | modules/serialization/ |
+| F-406 | serialization 模块（资产格式、import/export） | Accepted | v0.2 / v0.3 | JSON/RBIN 场景保存加载已实现；外部资产 import/export 待 Phase 3 |
+| F-407 | 场景持久化稳定网格路径，重启加载并恢复 GPU 资源 | Implemented | v0.2 | 内置 cube/quad/sphere；真实 JSON/RBIN 文件往返；ADR-0011 |
 
 ### 1.6 编辑器
 

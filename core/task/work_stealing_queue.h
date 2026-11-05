@@ -2,17 +2,17 @@
 
 #include "core/typedefs.h"
 
-#include <atomic>
 #include <cassert>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 namespace rover
 {
 
-    // Chase-Lev work-stealing deque.
-    // Owner thread pushes/pops from the bottom (LIFO — cache-hot).
-    // Other threads steal from the top (FIFO).
-    // Capacity must be a power of two.
+    // Bounded work-stealing deque. Owners pop LIFO; thieves steal FIFO.
+    // Slot ownership is protected by a mutex because T may be a non-trivial,
+    // move-sensitive object such as std::function.
     template <typename T>
     class WorkStealingQueue
     {
@@ -25,76 +25,53 @@ namespace rover
         WorkStealingQueue(const WorkStealingQueue&)            = delete;
         WorkStealingQueue& operator=(const WorkStealingQueue&) = delete;
 
-        void push(T item)
+        bool push(T item) { return try_push(item); }
+
+        // On overflow item remains intact so the caller can use another queue.
+        bool try_push(T& item)
         {
-            i64 b = bottom_.load(std::memory_order_relaxed);
-            i64 t = top_.load(std::memory_order_acquire);
-
-            if (static_cast<usize>(b - t) >= capacity_)
-            {
-                return; // full — drop (caller can fall back to global queue)
-            }
-
-            buffer_[static_cast<usize>(b) & mask_] = std::move(item);
-            std::atomic_thread_fence(std::memory_order_release);
-            bottom_.store(b + 1, std::memory_order_relaxed);
-        }
-
-        // Pop from bottom — owner thread only.
-        bool try_pop(T& out)
-        {
-            i64 b = bottom_.load(std::memory_order_relaxed) - 1;
-            bottom_.store(b, std::memory_order_relaxed);
-            std::atomic_thread_fence(std::memory_order_seq_cst);
-            i64 t = top_.load(std::memory_order_relaxed);
-
-            if (t <= b)
-            {
-                out = std::move(buffer_[static_cast<usize>(b) & mask_]);
-                if (t == b)
-                {
-                    // Last element — race with stealers.
-                    if (!top_.compare_exchange_strong(t, t + 1, std::memory_order_seq_cst, std::memory_order_relaxed))
-                    {
-                        bottom_.store(t + 1, std::memory_order_relaxed);
-                        return false;
-                    }
-                    bottom_.store(t + 1, std::memory_order_relaxed);
-                }
-                return true;
-            }
-
-            // Queue was empty.
-            bottom_.store(t, std::memory_order_relaxed);
-            return false;
-        }
-
-        // Steal from top — any thread.
-        bool try_steal(T& out)
-        {
-            i64 t = top_.load(std::memory_order_acquire);
-            std::atomic_thread_fence(std::memory_order_seq_cst);
-            i64 b = bottom_.load(std::memory_order_acquire);
-
-            if (t >= b)
+            std::lock_guard lock(mutex_);
+            if (size_ == capacity_)
             {
                 return false;
             }
+            buffer_[(top_ + size_) & mask_] = std::move(item);
+            ++size_;
+            return true;
+        }
 
-            out = buffer_[static_cast<usize>(t) & mask_];
-            if (!top_.compare_exchange_strong(t, t + 1, std::memory_order_seq_cst, std::memory_order_relaxed))
+        bool try_pop(T& out)
+        {
+            std::lock_guard lock(mutex_);
+            if (size_ == 0)
             {
-                return false; // lost race with another stealer or owner
+                return false;
             }
+            --size_;
+            out = std::move(buffer_[(top_ + size_) & mask_]);
+            return true;
+        }
+
+        bool try_steal(T& out)
+        {
+            std::lock_guard lock(mutex_);
+            if (size_ == 0)
+            {
+                return false;
+            }
+            out  = std::move(buffer_[top_]);
+            top_ = (top_ + 1) & mask_;
+            --size_;
             return true;
         }
 
     private:
-        usize            capacity_;
-        usize            mask_;
-        std::vector<T>   buffer_;
-        std::atomic<i64> bottom_{0};
-        std::atomic<i64> top_{0};
+        usize          capacity_;
+        usize          mask_;
+        std::vector<T> buffer_;
+        usize          top_  = 0;
+        usize          size_ = 0;
+        std::mutex     mutex_;
     };
 
 } // namespace rover
