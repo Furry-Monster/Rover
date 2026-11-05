@@ -1,0 +1,975 @@
+{
+  "version": 2,
+  "entities": [
+    {
+      "id": 0,
+      "components": {
+        "name": {
+          "value": "MainCamera"
+        },
+        "transform": {
+          "position": {
+            "x": 7,
+            "y": 7.5,
+            "z": 10
+          },
+          "rotation": {
+            "w": 0.91854738,
+            "x": 0.25668398,
+            "y": -0.28954656,
+            "z": -0.0809125
+          }
+        },
+        "camera": {
+          "projection": 0,
+          "fov_y_radians": 1.0471976,
+          "near_plane": 0.1,
+          "far_plane": 100,
+          "primary": true
+        }
+      }
+    },
+    {
+      "id": 1,
+      "components": {
+        "name": {
+          "value": "Sun"
+        },
+        "light": {
+          "type": 0,
+          "color": {
+            "x": 1,
+            "y": 0.9,
+            "z": 0.75
+          },
+          "intensity": 1.05,
+          "direction": {
+            "x": -0.379049,
+            "y": -0.758098,
+            "z": -0.5306686
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "name": {
+          "value": "Ground"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.25,
+            "z": 0
+          },
+          "scale": {
+            "x": 8,
+            "y": 0.18,
+            "z": 8
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "name": {
+          "value": "Tile 0 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2,
+            "y": -0.03,
+            "z": -2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "components": {
+        "name": {
+          "value": "Tile 0 1"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": -0.1,
+            "z": -2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "components": {
+        "name": {
+          "value": "Tile 0 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.03,
+            "z": -2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "components": {
+        "name": {
+          "value": "Tile 0 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1,
+            "y": -0.1,
+            "z": -2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "components": {
+        "name": {
+          "value": "Tile 0 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2,
+            "y": -0.03,
+            "z": -2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "components": {
+        "name": {
+          "value": "Tile 1 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2,
+            "y": -0.1,
+            "z": -1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "components": {
+        "name": {
+          "value": "Tile 1 1"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": -0.03,
+            "z": -1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "components": {
+        "name": {
+          "value": "Tile 1 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.1,
+            "z": -1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "components": {
+        "name": {
+          "value": "Tile 1 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1,
+            "y": -0.03,
+            "z": -1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "components": {
+        "name": {
+          "value": "Tile 1 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2,
+            "y": -0.1,
+            "z": -1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "components": {
+        "name": {
+          "value": "Tile 2 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2,
+            "y": -0.03,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "components": {
+        "name": {
+          "value": "Tile 2 1"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": -0.1,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "components": {
+        "name": {
+          "value": "Tile 2 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.03,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "components": {
+        "name": {
+          "value": "Tile 2 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1,
+            "y": -0.1,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "components": {
+        "name": {
+          "value": "Tile 2 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2,
+            "y": -0.03,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "components": {
+        "name": {
+          "value": "Tile 3 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2,
+            "y": -0.1,
+            "z": 1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "components": {
+        "name": {
+          "value": "Tile 3 1"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": -0.03,
+            "z": 1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "components": {
+        "name": {
+          "value": "Tile 3 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.1,
+            "z": 1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "components": {
+        "name": {
+          "value": "Tile 3 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1,
+            "y": -0.03,
+            "z": 1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "components": {
+        "name": {
+          "value": "Tile 3 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2,
+            "y": -0.1,
+            "z": 1
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "components": {
+        "name": {
+          "value": "Tile 4 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2,
+            "y": -0.03,
+            "z": 2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "components": {
+        "name": {
+          "value": "Tile 4 1"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": -0.1,
+            "z": 2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "components": {
+        "name": {
+          "value": "Tile 4 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -0.03,
+            "z": 2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "components": {
+        "name": {
+          "value": "Tile 4 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1,
+            "y": -0.1,
+            "z": 2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.1,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "components": {
+        "name": {
+          "value": "Tile 4 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2,
+            "y": -0.03,
+            "z": 2
+          },
+          "scale": {
+            "x": 0.94,
+            "y": 0.24,
+            "z": 0.94
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "components": {
+        "name": {
+          "value": "Column -2.6 -2.6"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 0.7,
+            "z": -2.6
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "components": {
+        "name": {
+          "value": "Column cap -2.6 -2.6"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 1.65,
+            "z": -2.6
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "components": {
+        "name": {
+          "value": "Column -2.6 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 0.7,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "components": {
+        "name": {
+          "value": "Column cap -2.6 0"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 1.65,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "components": {
+        "name": {
+          "value": "Column -2.6 2.6"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 0.7,
+            "z": 2.6
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 33,
+      "components": {
+        "name": {
+          "value": "Column cap -2.6 2.6"
+        },
+        "transform": {
+          "position": {
+            "x": -2.6,
+            "y": 1.65,
+            "z": 2.6
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "components": {
+        "name": {
+          "value": "Column 2.6 -2.6"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 0.7,
+            "z": -2.6
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "components": {
+        "name": {
+          "value": "Column cap 2.6 -2.6"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 1.65,
+            "z": -2.6
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 36,
+      "components": {
+        "name": {
+          "value": "Column 2.6 0"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 0.7,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 37,
+      "components": {
+        "name": {
+          "value": "Column cap 2.6 0"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 1.65,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "components": {
+        "name": {
+          "value": "Column 2.6 2.6"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 0.7,
+            "z": 2.6
+          },
+          "scale": {
+            "x": 0.32,
+            "y": 1.6,
+            "z": 0.32
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 39,
+      "components": {
+        "name": {
+          "value": "Column cap 2.6 2.6"
+        },
+        "transform": {
+          "position": {
+            "x": 2.6,
+            "y": 1.65,
+            "z": 2.6
+          },
+          "scale": {
+            "x": 0.27,
+            "y": 0.27,
+            "z": 0.27
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 40,
+      "components": {
+        "name": {
+          "value": "Center plinth"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0.25,
+            "z": 0
+          },
+          "scale": {
+            "x": 1.5,
+            "y": 0.55,
+            "z": 1.5
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 41,
+      "components": {
+        "name": {
+          "value": "Center sphere"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.05,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    }
+  ]
+}

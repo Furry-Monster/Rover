@@ -46,6 +46,40 @@ TEST_CASE("make_sphere produces (lat+1)*(lon+1) verts and degenerates to identit
     }
 }
 
+TEST_CASE("Primitive triangles face in the direction of their vertex normals")
+{
+    MeshData mesh;
+    SUBCASE("cube")
+    {
+        mesh = make_cube();
+    }
+    SUBCASE("quad")
+    {
+        mesh = make_quad();
+    }
+    SUBCASE("sphere")
+    {
+        mesh = make_sphere(1.0f, 8, 12);
+    }
+
+    usize checked_faces = 0;
+    for (usize i = 0; i < mesh.indices.size(); i += 3)
+    {
+        const auto& a           = mesh.vertices[mesh.indices[i]];
+        const auto& b           = mesh.vertices[mesh.indices[i + 1]];
+        const auto& c           = mesh.vertices[mesh.indices[i + 2]];
+        const auto  face_normal = (b.position - a.position).cross(c.position - a.position);
+        // UV sphere pole triangles have zero area.
+        if (face_normal.length_squared() < 1.0e-12f)
+        {
+            continue;
+        }
+        CHECK(face_normal.dot(a.normal + b.normal + c.normal) > 0.0f);
+        ++checked_faces;
+    }
+    CHECK(checked_faces > 0);
+}
+
 TEST_CASE("make_solid_rgba fills uniformly")
 {
     auto t = make_solid_rgba(4, 4, 200, 100, 50, 255);

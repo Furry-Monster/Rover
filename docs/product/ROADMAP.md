@@ -91,7 +91,7 @@
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）
 - ✅ `core/variant/`：Variant + Callable
 - ✅ 渲染端：BindGroup / push constant / staging 上传 / `update_texture`
-- ✅ ECS 立方体 + 相机 + 平行光 demo，支持深度缓冲
+- ✅ ECS 立方体 + 相机 + 平行光 demo，支持深度缓冲；另提供几何体、层级、遮挡、正交建筑与庭院五个 [示例场景](../../main/builtin_assets/scenes/demos/README.md)
 - ✅ 场景加载闭环：version 2 保存稳定网格路径，重启恢复 GPU 缓冲；`--scene` 文件仅首次创建，渲染实际加载的 World（[ADR-0011](adr/ADR-0011-scene-mesh-resource-paths.md)）
 - 🎯 外部资产导入、材质/纹理持久引用、磁盘资产注册表：Phase 3
 

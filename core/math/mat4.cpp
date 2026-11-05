@@ -144,10 +144,10 @@ namespace rover
         const f32 fn = z_far - z_near;
 
         out.c[0][0] = 2.0f / rl;
-        out.c[1][1] = 2.0f / tb;
+        out.c[1][1] = -2.0f / tb;
         out.c[2][2] = -1.0f / fn;
         out.c[3][0] = -(right + left) / rl;
-        out.c[3][1] = -(top + bottom) / tb;
+        out.c[3][1] = (top + bottom) / tb;
         out.c[3][2] = -z_near / fn;
         out.c[3][3] = 1.0f;
         return out;

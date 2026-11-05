@@ -113,9 +113,8 @@ namespace rover
         [[nodiscard]] static Mat4 perspective(f32 fovy, f32 aspect, f32 z_near, f32 z_far) noexcept;
 
         /**
-         * Orthographic projection; depth mapping matches `perspective` (canonical
-         * / modern-API Z in [0, 1]). Y axis matches `perspective` only if used with
-         * the same viewport convention as the active backend.
+         * Orthographic projection in the same canonical clip space as
+         * `perspective`: Z in [0, 1], Y flipped, positive viewport height.
          */
         [[nodiscard]] static Mat4 ortho(f32 left, f32 right, f32 bottom, f32 top, f32 z_near, f32 z_far) noexcept;
 

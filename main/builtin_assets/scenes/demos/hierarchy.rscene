@@ -1,0 +1,661 @@
+{
+  "version": 2,
+  "entities": [
+    {
+      "id": 0,
+      "components": {
+        "name": {
+          "value": "MainCamera"
+        },
+        "transform": {
+          "position": {
+            "x": 6,
+            "y": 5,
+            "z": 10
+          },
+          "rotation": {
+            "w": 0.94574864,
+            "x": 0.18521869,
+            "y": -0.26195721,
+            "z": -0.05130261
+          }
+        },
+        "camera": {
+          "projection": 0,
+          "fov_y_radians": 1.0471976,
+          "near_plane": 0.1,
+          "far_plane": 100,
+          "primary": true
+        }
+      }
+    },
+    {
+      "id": 1,
+      "components": {
+        "name": {
+          "value": "Sun"
+        },
+        "light": {
+          "type": 0,
+          "color": {
+            "x": 1,
+            "y": 0.88,
+            "z": 0.65
+          },
+          "intensity": 1.05,
+          "direction": {
+            "x": -0.379049,
+            "y": -0.758098,
+            "z": -0.5306686
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "name": {
+          "value": "Ground"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -1.65,
+            "z": 0
+          },
+          "scale": {
+            "x": 11,
+            "y": 0.18,
+            "z": 11
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "name": {
+          "value": "Rotated assembly"
+        },
+        "transform": {
+          "position": {
+            "x": -1,
+            "y": 0.15,
+            "z": 0
+          },
+          "rotation": {
+            "w": 0.96592583,
+            "x": -0.0,
+            "y": -0.258819,
+            "z": -0.0
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "components": {
+        "name": {
+          "value": "Hub"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.65,
+            "y": 0.65,
+            "z": 0.65
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": 5,
+      "components": {
+        "name": {
+          "value": "Arm pivot 1"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "w": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "parent": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": 6,
+      "components": {
+        "name": {
+          "value": "Arm beam 1"
+        },
+        "transform": {
+          "position": {
+            "x": 1.2,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1.7,
+            "y": 0.18,
+            "z": 0.18
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "id": 7,
+      "components": {
+        "name": {
+          "value": "Satellite 1"
+        },
+        "transform": {
+          "position": {
+            "x": 2.25,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.4,
+            "y": 0.4,
+            "z": 0.4
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "id": 8,
+      "components": {
+        "name": {
+          "value": "Nested satellite 1"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.6,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.45,
+            "y": 0.45,
+            "z": 0.45
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.2164396
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 7
+        }
+      }
+    },
+    {
+      "id": 9,
+      "components": {
+        "name": {
+          "value": "Arm pivot 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "w": 0.70710678,
+            "x": 0.0,
+            "y": 0.7071068,
+            "z": 0.0
+          }
+        },
+        "parent": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": 10,
+      "components": {
+        "name": {
+          "value": "Arm beam 2"
+        },
+        "transform": {
+          "position": {
+            "x": 1.2,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1.7,
+            "y": 0.18,
+            "z": 0.18
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 9
+        }
+      }
+    },
+    {
+      "id": 11,
+      "components": {
+        "name": {
+          "value": "Satellite 2"
+        },
+        "transform": {
+          "position": {
+            "x": 2.25,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.4,
+            "y": 0.4,
+            "z": 0.4
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 9
+        }
+      }
+    },
+    {
+      "id": 12,
+      "components": {
+        "name": {
+          "value": "Nested satellite 2"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.6,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.45,
+            "y": 0.45,
+            "z": 0.45
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.2164396
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 11
+        }
+      }
+    },
+    {
+      "id": 13,
+      "components": {
+        "name": {
+          "value": "Arm pivot 3"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "w": 0.0,
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        "parent": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": 14,
+      "components": {
+        "name": {
+          "value": "Arm beam 3"
+        },
+        "transform": {
+          "position": {
+            "x": 1.2,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1.7,
+            "y": 0.18,
+            "z": 0.18
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 13
+        }
+      }
+    },
+    {
+      "id": 15,
+      "components": {
+        "name": {
+          "value": "Satellite 3"
+        },
+        "transform": {
+          "position": {
+            "x": 2.25,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.4,
+            "y": 0.4,
+            "z": 0.4
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 13
+        }
+      }
+    },
+    {
+      "id": 16,
+      "components": {
+        "name": {
+          "value": "Nested satellite 3"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.6,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.45,
+            "y": 0.45,
+            "z": 0.45
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.2164396
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 15
+        }
+      }
+    },
+    {
+      "id": 17,
+      "components": {
+        "name": {
+          "value": "Arm pivot 4"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "w": -0.70710678,
+            "x": 0.0,
+            "y": 0.7071068,
+            "z": 0.0
+          }
+        },
+        "parent": {
+          "index": 3
+        }
+      }
+    },
+    {
+      "id": 18,
+      "components": {
+        "name": {
+          "value": "Arm beam 4"
+        },
+        "transform": {
+          "position": {
+            "x": 1.2,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1.7,
+            "y": 0.18,
+            "z": 0.18
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 17
+        }
+      }
+    },
+    {
+      "id": 19,
+      "components": {
+        "name": {
+          "value": "Satellite 4"
+        },
+        "transform": {
+          "position": {
+            "x": 2.25,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.4,
+            "y": 0.4,
+            "z": 0.4
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 17
+        }
+      }
+    },
+    {
+      "id": 20,
+      "components": {
+        "name": {
+          "value": "Nested satellite 4"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.6,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.45,
+            "y": 0.45,
+            "z": 0.45
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.2164396
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 19
+        }
+      }
+    },
+    {
+      "id": 21,
+      "components": {
+        "name": {
+          "value": "Scaled copy"
+        },
+        "transform": {
+          "position": {
+            "x": 3,
+            "y": -0.65,
+            "z": 1.7
+          },
+          "scale": {
+            "x": 0.65,
+            "y": 0.65,
+            "z": 0.65
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": 0.0,
+            "y": 0.2164396,
+            "z": 0.0
+          }
+        }
+      }
+    },
+    {
+      "id": 22,
+      "components": {
+        "name": {
+          "value": "Copy hub"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 21
+        }
+      }
+    },
+    {
+      "id": 23,
+      "components": {
+        "name": {
+          "value": "Copy mast"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 1.3,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.2,
+            "y": 1.8,
+            "z": 0.2
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        },
+        "parent": {
+          "index": 21
+        }
+      }
+    },
+    {
+      "id": 24,
+      "components": {
+        "name": {
+          "value": "Copy cap"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 2.4,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        },
+        "parent": {
+          "index": 21
+        }
+      }
+    }
+  ]
+}

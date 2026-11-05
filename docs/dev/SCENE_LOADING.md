@@ -2,6 +2,8 @@
 
 mesh demo 从 JSON `.rscene` 文件加载实际渲染的 World。文件不存在时生成默认相机、平行光、立方体并保存；文件已存在时直接加载，不覆盖用户修改。
 
+仓库还提供几何体展台、父子层级、深度遮挡、正交建筑、棋盘庭院五个场景，运行方式见 [main/builtin_assets/scenes/demos/README.md](../../main/builtin_assets/scenes/demos/README.md)。
+
 ## 运行
 
 在仓库根目录，使用已有 CMake 构建目录：

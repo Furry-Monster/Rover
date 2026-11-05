@@ -118,6 +118,8 @@ Rover/
 │   └── CMakeLists.txt          → rover_editor / Rover::Editor
 │
 ├── main/
+│   ├── builtin_assets/         引擎内置资源（按资源类型组织）
+│   │   └── scenes/demos/      五个 .rscene 示例场景
 │   ├── main.cpp                组合根
 │   └── CMakeLists.txt          → rover (EXECUTABLE)
 │
@@ -548,6 +550,7 @@ TEST_CASE("Vector3 dot product") {
 - [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
 - [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）
 - [x] **main/mesh_demo**：ECS 立方体 + 相机 + 平行光 demo，FrameGraph 驱动
+- [x] **main/builtin_assets/scenes/demos/**：五个 version 2 场景示例（几何体展台、父子层级、深度遮挡、正交建筑、棋盘庭院），通过同一 `--scene` 入口加载，见 [运行说明](../../main/builtin_assets/scenes/demos/README.md)。内置 cube / quad / sphere 使用与外法线一致的三角形绕序，支持背面剔除。
 - [x] **Phase 2 场景加载闭环**（[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)）：场景 version 2 持久化 `MeshComponent::mesh_asset` 路径，运行时句柄不落盘；serialization 模块中的 `MeshAssetCache` 通过 `GraphicsDevice` 恢复并共享 cube / quad / sphere 缓冲。缓存独占 GPU 缓冲，组件借用句柄，缓存销毁早于设备关闭。加载成功替换目标 World，失败保留原 World；JSON 组件恢复向量与四元数字典。demo 的 `--scene` 文件只在不存在时初始化，渲染实际加载的 World。
 - [ ] **editor/gui/**：ImGui 主循环、Dock、Inspector、Asset Browser（Phase 3）
 - [ ] **editor/cli/**：命令解析、暴露 `import / export / build`（Phase 3）

@@ -180,6 +180,27 @@ TEST_CASE("Mat4: inverse(translate) cancels the translation")
     CHECK(r.z() == doctest::Approx(0.0f));
 }
 
+TEST_CASE("Mat4: orthographic bounds map to canonical clip coordinates")
+{
+    const auto projection   = Mat4::ortho(-2.0f, 6.0f, -1.0f, 3.0f, 0.5f, 20.0f);
+    const auto top_left     = projection * Vector4{-2.0f, 3.0f, -0.5f, 1.0f};
+    const auto bottom_right = projection * Vector4{6.0f, -1.0f, -20.0f, 1.0f};
+    const auto center       = projection * Vector4{2.0f, 1.0f, -1.0f, 1.0f};
+    CHECK(top_left.x() == doctest::Approx(-1.0f));
+    CHECK(top_left.y() == doctest::Approx(-1.0f));
+    CHECK(top_left.z() == doctest::Approx(0.0f));
+    CHECK(top_left.w() == doctest::Approx(1.0f));
+    CHECK(bottom_right.x() == doctest::Approx(1.0f));
+    CHECK(bottom_right.y() == doctest::Approx(1.0f));
+    CHECK(bottom_right.z() == doctest::Approx(1.0f));
+    CHECK(center.x() == doctest::Approx(0.0f));
+    CHECK(center.y() == doctest::Approx(0.0f));
+
+    const auto perspective  = Mat4::perspective(1.0f, 1.0f, 0.5f, 20.0f);
+    const auto above_center = perspective * Vector4{0.0f, 1.0f, -5.0f, 1.0f};
+    CHECK(above_center.y() / above_center.w() < 0.0f);
+}
+
 // ---------------------------------------------------------------------------
 // Quat
 // ---------------------------------------------------------------------------

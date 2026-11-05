@@ -45,7 +45,11 @@
 
 ### 2.2 引擎内置资产
 
-引擎自带的资产（如默认 shader、内置字体）放 `main/shaders/`、`main/builtin_assets/` 等位置（ps:这并不是最终设计，确定最终设计后请修改此处）。当前 Phase 1 仅有 `main/shaders/`。
+[`main/builtin_assets/`](../../main/builtin_assets/README.md) 是引擎内置资源的统一存放位置，按资源类型组织。场景放在 `scenes/` 下，示例场景集中于 `scenes/demos/`；后续模型、纹理、材质、字体、音频分别放入 `models/`、`textures/`、`materials/`、`fonts/`、`audio/`，在加入对应资源时创建目录。
+
+当前五个 Phase 2 示例场景通过 `--scene main/builtin_assets/scenes/demos/<name>.rscene` 加载，见 [运行说明](../../main/builtin_assets/scenes/demos/README.md)。
+
+当前参与编译的 shader 源文件位于 `main/shaders/`，其编译流程见下文。
 
 ### 2.3 资产虚拟路径（计划）
 
@@ -262,7 +266,7 @@ public:
 - ✅ 所有源资产（`assets/**`）
 - ✅ `.meta.json` 元数据
 - ✅ Asset Registry 数据库（如果是文本格式）
-- ✅ 引擎内置资产（`main/shaders/**`、`main/builtin_assets/**`）
+- ✅ 引擎资源（`main/builtin_assets/**`，以及当前编译期 shader 源 `main/shaders/**`）
 
 ### 8.2 不应该提交的
 

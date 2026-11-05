@@ -189,7 +189,7 @@ ROVER_APP_DEBUG("Player position: ({}, {}, {})", x, y, z);
 ### 5.1 设计原则
 
 - **手写标量实现**：向量 / 四元数为头文件；`Mat4` 的求逆与部分工厂放在 `mat4.cpp`，避免符号膨胀。
-- **列主序**：与 Vulkan、着色器约定一致；`Mat4::perspective` / `ortho` 输出 **clip-space Z ∈ [0, 1]**（Vulkan）。
+- **列主序**：与 Vulkan、着色器约定一致；`Mat4::perspective` / `ortho` 输出 **clip-space Z ∈ [0, 1]**，两者都翻转 Y，配合正高度 viewport；正交投影的非对称边界平移也包含 Y 翻转。
 - **四元数布局**：与 Godot 一致，分量存放在 `.v.x`/`.v.y`/`.v.z`/`.v.w`。
 - **`[[nodiscard]]`**：返回值的方法标记 `[[nodiscard]]` 防止忽略结果
 - **Trivially copyable**：向量 / Quat / Mat4 可安全 memcpy / POD 用法

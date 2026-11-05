@@ -1,0 +1,234 @@
+{
+  "version": 2,
+  "entities": [
+    {
+      "id": 0,
+      "components": {
+        "name": {
+          "value": "MainCamera"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 2.1,
+            "z": 9
+          },
+          "rotation": {
+            "w": 0.99402894,
+            "x": 0.10911677,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "camera": {
+          "projection": 0,
+          "fov_y_radians": 1.0471976,
+          "near_plane": 0.1,
+          "far_plane": 100,
+          "primary": true
+        }
+      }
+    },
+    {
+      "id": 1,
+      "components": {
+        "name": {
+          "value": "Sun"
+        },
+        "light": {
+          "type": 0,
+          "color": {
+            "x": 0.82,
+            "y": 0.7,
+            "z": 1
+          },
+          "intensity": 1.05,
+          "direction": {
+            "x": -0.379049,
+            "y": -0.758098,
+            "z": -0.5306686
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "name": {
+          "value": "Backdrop"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0.35,
+            "z": -3.5
+          },
+          "scale": {
+            "x": 6,
+            "y": 3.6,
+            "z": 1
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/quad"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "name": {
+          "value": "Ground"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": -1.2,
+            "z": 0
+          },
+          "scale": {
+            "x": 10,
+            "y": 0.18,
+            "z": 10
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "components": {
+        "name": {
+          "value": "Far tower"
+        },
+        "transform": {
+          "position": {
+            "x": 1.75,
+            "y": 0.2,
+            "z": -2.3
+          },
+          "scale": {
+            "x": 1.2,
+            "y": 2.5,
+            "z": 1.2
+          },
+          "rotation": {
+            "w": 0.95371695,
+            "x": 0.0,
+            "y": 0.3007058,
+            "z": 0.0
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "components": {
+        "name": {
+          "value": "Middle slab"
+        },
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0.1,
+            "z": 0
+          },
+          "scale": {
+            "x": 3.3,
+            "y": 1.5,
+            "z": 0.25
+          },
+          "rotation": {
+            "w": 0.98768834,
+            "x": 0.0,
+            "y": 0.1564345,
+            "z": 0.0
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "components": {
+        "name": {
+          "value": "Far sphere"
+        },
+        "transform": {
+          "position": {
+            "x": -1.25,
+            "y": 0.9,
+            "z": -1.6
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "components": {
+        "name": {
+          "value": "Near sphere"
+        },
+        "transform": {
+          "position": {
+            "x": 1.1,
+            "y": 0.05,
+            "z": 1.4
+          },
+          "scale": {
+            "x": 0.85,
+            "y": 0.85,
+            "z": 0.85
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/sphere"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "components": {
+        "name": {
+          "value": "Near cube"
+        },
+        "transform": {
+          "position": {
+            "x": -0.55,
+            "y": -0.1,
+            "z": 2.0
+          },
+          "scale": {
+            "x": 1.5,
+            "y": 1.5,
+            "z": 1.5
+          },
+          "rotation": {
+            "w": 0.97629601,
+            "x": -0.0,
+            "y": -0.2164396,
+            "z": -0.0
+          }
+        },
+        "mesh": {
+          "mesh_asset": "builtin://meshes/cube"
+        }
+      }
+    }
+  ]
+}

@@ -123,11 +123,11 @@ namespace rover
                 const u32 c = a + ring;
                 const u32 d = c + 1;
                 m.indices.push_back(a);
-                m.indices.push_back(c);
-                m.indices.push_back(b);
                 m.indices.push_back(b);
                 m.indices.push_back(c);
+                m.indices.push_back(b);
                 m.indices.push_back(d);
+                m.indices.push_back(c);
             }
         }
         return m;
