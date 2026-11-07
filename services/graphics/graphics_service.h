@@ -31,7 +31,7 @@ namespace rover
 
         [[nodiscard]] FrameGraph& frame_graph() { return frame_graph_; }
 
-        // Convenience: clears + recompiles + executes the frame graph against
+        // Convenience: compiles + executes the authored frame graph against
         // the bound device. Caller wraps with begin_frame / end_frame / present.
         void render_frame();
 

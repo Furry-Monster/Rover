@@ -1,6 +1,6 @@
 # 命名约定
 
-> 本规范是 Rover 引擎所有第一方代码（`core/`、`drivers/`、`platform/`、`services/`、`modules/`、`editor/`、`main/`、`tests/`）必须遵守的命名规则。vendor 第三方代码不受约束。
+本规范适用于 `core/`、`drivers/`、`platform/`、`services/`、`modules/`、`editor/`、`main/` 和 `tests/` 的第一方代码。vendor 库保留上游命名。
 
 ---
 
@@ -33,7 +33,7 @@
 - 所有第一方代码顶级位于 `namespace rover { ... }` 内
 - 子命名空间允许但不强制；倾向于**扁平**
 - 不允许 `using namespace rover;` 出现在头文件中（cpp 文件中可酌情使用）
-- 不允许 `using namespace std;`，永远显式 `std::xxx`
+- 标准库名称使用显式 `std::` 前缀，禁止 `using namespace std;`
 
 ### 何时使用嵌套
 
@@ -68,7 +68,7 @@ namespace rover::detail { ... } // 实现细节可接受
 - 类与结构体使用 `PascalCase`：`GraphicsService`、`Vector3`
 - 即使是 POD 也用 `PascalCase`，不用 `_t` 后缀
 - 一律使用 `enum class`（强类型枚举）
-- 枚举值也使用 `PascalCase`（注意：不是 SCREAMING_SNAKE_CASE）
+- 枚举值使用 `PascalCase`
 
 ### `class` vs `struct`
 
@@ -285,7 +285,7 @@ inline constexpr f64 PI          = 3.14159265358979323846;
 
 ## 9. 注册函数命名
 
-注册系统是引擎的关键基础设施，命名严格统一：
+注册函数按层级使用以下名称：
 
 | 层级 | 注册函数 |
 |------|---------|
@@ -299,7 +299,7 @@ inline constexpr f64 PI          = 3.14159265358979323846;
 | modules（具体） | `register_<name>_types()` / `unregister_<name>_types()` |
 | editor | `register_editor_types()` / `register_editor_gui()` / `register_editor_cli()` |
 
-**强约束**：每个层 / 模块都必须暴露这些函数，且不能省略 `unregister_*`。`main/` 严格按反序调用 unregister。
+每个层或模块必须成对提供注册与 `unregister_*` 入口。`main/` 按注册顺序的反序调用注销函数。
 
 ---
 

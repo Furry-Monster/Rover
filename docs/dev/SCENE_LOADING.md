@@ -1,6 +1,6 @@
 # Phase 2 场景加载
 
-mesh demo 从 JSON `.rscene` 文件加载实际渲染的 World。文件不存在时生成默认相机、平行光、立方体并保存；文件已存在时直接加载，不覆盖用户修改。
+mesh demo 从 JSON `.rscene` 文件加载并渲染 World。文件不存在时生成默认相机、平行光、立方体并保存；文件已存在时直接加载，保留用户修改。
 
 仓库还提供几何体展台、父子层级、深度遮挡、正交建筑、棋盘庭院五个场景，运行方式见 [main/builtin_assets/scenes/demos/README.md](../../main/builtin_assets/scenes/demos/README.md)。
 
@@ -21,7 +21,7 @@ cmake --build build -j 4
 ./bin/debug/rover --scene /tmp/rover-demo.rscene --frames 5
 ```
 
-未传 `--scene` 时使用当前工作目录的 `demo.rscene`。`--demo triangle` 保留原始三角形演示；`--frames` 只用于 mesh demo。场景所在父目录须已存在。无效场景会报错退出，保留原文件。
+未传 `--scene` 时使用当前工作目录的 `demo.rscene`。`--demo triangle` 保留原始三角形演示；`--frames` 用于所有 demo。`--demo frame-graph` 验证离屏渲染与 GPU 像素回读，默认运行 8 帧，见 [Frame Graph](FRAME_GRAPH.md)。场景所在父目录须已存在。无效场景会报错退出，保留原文件。
 
 ## 场景格式与网格资源
 
@@ -41,9 +41,9 @@ cmake --build build -j 4
 | `builtin://meshes/quad` | XY 平面上的单位 quad |
 | `builtin://meshes/sphere` | 半径 1 的 UV 球 |
 
-修改 `transform.scale` 调整尺寸。外部网格路径暂不支持，未知或空路径会明确报错。材质目前使用 demo 的固定无纹理着色；纹理上传工具仍存在，但纹理/采样器句柄不会写入场景。
+修改 `transform.scale` 调整尺寸。加载器接受上表中的内置路径，外部、未知或空网格路径会报错。demo 使用固定无纹理着色；纹理上传由工具接口提供，纹理和采样器句柄作为运行时数据管理。
 
-`MeshAssetCache` 在 serialization 模块内根据路径生成 CPU 网格，通过抽象 `GraphicsDevice` 上传；同路径共享缓冲。缓存拥有 GPU 缓冲，组件只借用。缓存释放前等待 GPU 完成，且必须早于设备关闭销毁。重新 `clear()` 后，旧组件中的句柄不得用于绘制，需再次 `resolve()`。
+`MeshAssetCache` 在 serialization 模块内按路径生成 CPU 网格，通过抽象 `GraphicsDevice` 上传；同路径共享缓冲。缓存拥有 GPU 缓冲，组件借用句柄。销毁缓存前等待 GPU 完成，缓存销毁后再关闭设备。调用 `clear()` 后，重新 `resolve()` 再使用组件绘制，旧句柄失效。
 
 ## 序列化行为
 
@@ -62,8 +62,6 @@ cmake --build build -j 4
 ctest --test-dir build --output-on-failure
 ```
 
-相关决策：[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)。Frame Graph 的依赖 DAG 已实现，见 [使用契约](FRAME_GRAPH.md)；跨 pass 自动 barrier 仍在后续范围内。
+相关决策：[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)。Frame Graph 的依赖 DAG 与单队列跨 pass 自动 barrier 已实现，见 [使用契约](FRAME_GRAPH.md)。
 
-2026-11-05 本地验证：Debug 构建成功；全量 128 个测试、777 条断言通过；任务队列与 JobSystem 测试连续运行 25 次通过。在 Intel Iris Xe / Vulkan 1.3 上启用现有验证层，首次创建与修改后重载各完成 5 帧；未知资源与损坏 JSON 均按预期退出并保留文件，未记录验证层 error。驱动初始化仍有既有的 `VK_KHR_get_physical_device_properties2` 被列为 device extension 的 warning，另行处理。
-
-本次修改的 C++ 文件通过格式检查；全库格式检查仍报告未修改的 `core/graphics/graphics_device.h`、`core/variant/callable.h`、`drivers/vulkan/vk_instance.cpp`、`tests/core/event_test.cpp` 存在格式差异。
+历史结果见 [2026-11-05 场景加载验证记录](../debug/SCENE_LOADING_VALIDATION.md)。

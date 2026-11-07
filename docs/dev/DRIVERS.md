@@ -1,6 +1,6 @@
 # Rover 引擎 Drivers 子系统文档
 
-> **权威文档** — 对 `drivers/` 的任何修改都 **必须** 同步更新本文档。修改前请先阅读本文档了解现有设计。
+本文说明 Vulkan 驱动的资源管理、命令录制、同步和注册流程。修改驱动接口或行为时同步更新对应章节。
 
 ---
 
@@ -34,7 +34,7 @@
 - `core/graphics/` 声明 `GraphicsDevice` 抽象接口与所有 GPU 资源类型（`BufferHandle`、`TextureDesc` 等）
 - `drivers/vulkan/` 提供 `GraphicsDeviceVulkan` 实现
 - `services/` 与 `main/` 仅依赖 `GraphicsDevice` 抽象，不知道具体后端
-- 通过 `register_vulkan_driver()` / `get_vulkan_device()` 函数获取实例的 `GraphicsDevice*`（不是 `GraphicsDeviceVulkan*`，避免 Vulkan + X11 头文件污染上层）
+- 通过 `register_vulkan_driver()` / `get_vulkan_device()` 获取抽象 `GraphicsDevice*`，由组合根向上层注入
 
 | 子系统 | 文件数 | 职责 |
 |--------|--------|------|
@@ -246,11 +246,11 @@ public:
 
 ### 6.3 每图像信号量（render_finished）
 
-**重要**：`render_finished_semaphore` 必须 **每个交换链图像一个**，而不是每帧（`kMaxFramesInFlight=2`）一个。原因：
+`render_finished_semaphore` 按交换链图像分配，每个图像一个。它的复用条件由呈现生命周期决定：
 
 - `vkQueuePresentKHR` 等待这个信号量
 - 信号量必须在 present 完成（图像可重新获取）后才能再次被等待
-- 仅 in-flight fence 不足以保证 present 已完成（fence 仅追踪 GPU 提交，不追踪 present 队列）
+- in-flight fence 跟踪 GPU 提交；present 队列的完成状态由图像重新获取确认
 - 解决方案：信号量与图像绑定，4 个图像 = 4 个信号量。每个图像本周期被使用前，上次的 present 必然已完成（否则不会再次被 acquire）
 
 参考：<https://github.com/KhronosGroup/Vulkan-Docs/issues/152>
@@ -302,7 +302,7 @@ private:
 
 - 句柄在创建时分配，永不重用（即使资源被 destroy）
 - `remove()` 后再次 `get()` 同一句柄会返回 `nullptr`
-- 0 永远表示 `INVALID_HANDLE`，`add()` / `get()` / `remove()` 都对 0 安全
+- 0 表示 `INVALID_HANDLE`，`add()` / `get()` / `remove()` 都对 0 安全
 
 ---
 
@@ -431,14 +431,14 @@ private:
 
 - `create_buffer`：用 VMA 分配，自动追加 `TRANSFER_DST_BIT | TRANSFER_SRC_BIT`，CPU 可访问的缓冲使用 `HOST_ACCESS_SEQUENTIAL_WRITE_BIT`
 - `destroy_buffer`：若映射先 unmap，再 `vmaDestroyBuffer`
-- `map_buffer` / `unmap_buffer`：缓存映射指针，避免重复 map
-- `update_buffer(handle, data, size, offset=0)`：内部 map + memcpy + unmap（适用于 host-visible 缓冲；GpuOnly 缓冲需要 staging buffer，当前未实现）
+- `map_buffer` / `unmap_buffer`：缓存映射指针；GpuToCpu 首次映射 invalidate 非一致缓存，调用方须先等待 GPU 完成
+- `update_buffer(handle, data, size, offset=0)`：host-visible 缓冲 map + memcpy + flush + unmap，记录 HostWrite；GpuOnly 通过 staging 上传并同步到默认读取用途。同步上传须在本帧命令录制前完成
 
 ### 10.2 Texture
 
 - `create_texture`：VMA 分配 image + 创建 ImageView。同时追加 `VK_IMAGE_USAGE_TRANSFER_DST_BIT` 用于上传
 - `destroy_texture`：仅销毁 `owns_image == true` 的资源；交换链图像静默忽略（防双重释放）
-- `update_texture`：当前 stub（输出 WARN）。完整实现需要 staging buffer + layout transition + `vkCmdCopyBufferToImage`，留待后续
+- `update_texture`：通过 staging + `vkCmdCopyBufferToImage` 上传单 mip、单层颜色图像，读取已跟踪的源状态；Sampled 纹理最终转为 ShaderRead，否则保留 TransferWrite。上传会 flush staging 内存，并拒绝在本帧命令录制后插队
 
 ### 10.3 Sampler
 
@@ -454,9 +454,10 @@ private:
 ### 10.5 RenderPass
 
 - 单一 subpass（v1 简化）
-- 颜色附件 `finalLayout` 固定为 `PRESENT_SRC_KHR`（适合 swapchain 输出）
+- 颜色附件初末布局均为 `COLOR_ATTACHMENT_OPTIMAL`，begin render pass 前根据真实 framebuffer 附件显式转换；离屏纹理不会转为 Present
 - 若 `has_depth_stencil`，深度附件 `finalLayout` 为 `DEPTH_STENCIL_ATTACHMENT_OPTIMAL`
-- 单个 subpass dependency 同步颜色 + 深度 access（`SUBPASS_EXTERNAL` → 0）
+- 深度附件初末布局均为 `DEPTH_STENCIL_ATTACHMENT_OPTIMAL`
+- 单个 subpass dependency 同步颜色 + 深度 access（`SUBPASS_EXTERNAL` → 0），包含 early/late fragment tests
 
 ### 10.6 Framebuffer
 
@@ -497,6 +498,8 @@ private:
 
 | 方法 | 对应 vk 命令 |
 |------|-------------|
+| `cmd_resource_barriers` | 整批验证目标用途后，用 `vkCmdPipelineBarrier` 转换缓冲/纹理 |
+| `cmd_copy_texture_to_buffer` | `vkCmdCopyImageToBuffer`，当前只支持紧密排列的二维 RGBA8 |
 | `cmd_begin_render_pass` | `vkCmdBeginRenderPass`（INLINE 内容） |
 | `cmd_end_render_pass` | `vkCmdEndRenderPass` |
 | `cmd_bind_pipeline` | `vkCmdBindPipeline`（GRAPHICS bind point） |
@@ -508,6 +511,8 @@ private:
 | `cmd_draw_indexed` | `vkCmdDrawIndexed` |
 
 ### 11.3 ClearValue 处理
+
+状态跟踪见 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。纹理记录当前布局对应的用途；缓冲/纹理保留最近写入与全部后续读阶段/访问掩码，新写入同步消费这些范围。`vk_sync.h` 负责映射，`graphics_device_vulkan_sync.cpp` 负责整批验证、同步和读回。每个命令列表串行打开/结束；barrier 只可在 render pass 外使用。同步上传只能在本帧命令录制前进行，上传后维护状态并 flush 非一致 staging 内存。
 
 `cmd_begin_render_pass` 接收 `const ClearValue*`、count，转换为 `VkClearValue` 数组：
 - 第 N 个 ClearValue 是颜色还是深度，取决于 render pass 是否最后一个附件是深度
@@ -541,12 +546,12 @@ private:
 ### 12.3 end_frame
 
 ```
-1. 收集 frame_command_lists_ 中所有 VkCommandBuffer
+1. 结束尚未关闭的命令列表，追加当前交换链纹理到 Present 的转换，再收集 frame_command_lists_ 中所有 VkCommandBuffer
 2. 对未结束录制的发出警告并 vkEndCommandBuffer
 3. 取本图像的 render_finished 信号量
 4. vkQueueSubmit:
    - waitSemaphore: image_available
-   - waitDstStageMask: COLOR_ATTACHMENT_OUTPUT_BIT
+   - waitDstStageMask: ALL_COMMANDS_BIT（涵盖首次图像布局转换）
    - commandBuffers: 全部
    - signalSemaphore: render_finished (per-image)
    - fence: in_flight

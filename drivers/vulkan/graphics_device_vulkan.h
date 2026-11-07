@@ -21,25 +21,32 @@ namespace rover
 
     struct VkBufferResource
     {
-        VkBuffer      buffer     = VK_NULL_HANDLE;
-        VmaAllocation allocation = nullptr;
-        VkDeviceSize  size       = 0;
-        bool          mapped     = false;
-        void*         mapped_ptr = nullptr;
-        BufferUsage   usage      = BufferUsage::Vertex;
-        MemoryUsage   memory     = MemoryUsage::GpuOnly;
+        VkBuffer             buffer      = VK_NULL_HANDLE;
+        VmaAllocation        allocation  = nullptr;
+        VkDeviceSize         size        = 0;
+        bool                 mapped      = false;
+        void*                mapped_ptr  = nullptr;
+        BufferUsage          usage       = BufferUsage::Vertex;
+        MemoryUsage          memory      = MemoryUsage::GpuOnly;
+        ResourceAccess       access      = ResourceAccess::Undefined;
+        VkPipelineStageFlags sync_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkAccessFlags        sync_access = 0;
     };
 
     struct VkTextureResource
     {
-        VkImage       image        = VK_NULL_HANDLE;
-        VkImageView   view         = VK_NULL_HANDLE;
-        VmaAllocation allocation   = nullptr;
-        VkFormat      format       = VK_FORMAT_UNDEFINED;
-        VkExtent3D    extent       = {};
-        u32           mip_levels   = 1;
-        u32           array_layers = 1;
-        bool          owns_image   = true;
+        VkImage              image        = VK_NULL_HANDLE;
+        VkImageView          view         = VK_NULL_HANDLE;
+        VmaAllocation        allocation   = nullptr;
+        VkFormat             format       = VK_FORMAT_UNDEFINED;
+        VkExtent3D           extent       = {};
+        u32                  mip_levels   = 1;
+        u32                  array_layers = 1;
+        bool                 owns_image   = true;
+        VkImageUsageFlags    usage        = 0;
+        ResourceAccess       access       = ResourceAccess::Undefined;
+        VkPipelineStageFlags sync_stages  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkAccessFlags        sync_access  = 0;
     };
 
     struct VkShaderResource
@@ -57,11 +64,13 @@ namespace rover
 
     struct VkFramebufferResource
     {
-        VkFramebuffer    framebuffer      = VK_NULL_HANDLE;
-        u32              width            = 0;
-        u32              height           = 0;
-        u32              attachment_count = 0;
-        RenderPassHandle render_pass      = INVALID_HANDLE;
+        VkFramebuffer              framebuffer      = VK_NULL_HANDLE;
+        u32                        width            = 0;
+        u32                        height           = 0;
+        u32                        attachment_count = 0;
+        RenderPassHandle           render_pass      = INVALID_HANDLE;
+        std::vector<TextureHandle> color_attachments;
+        TextureHandle              depth_stencil = INVALID_HANDLE;
     };
 
     struct VkPipelineResource
@@ -93,9 +102,10 @@ namespace rover
 
     struct VkCommandListResource
     {
-        VkCommandBuffer buffer    = VK_NULL_HANDLE;
-        bool            recording = false;
-        bool            submitted = false;
+        VkCommandBuffer buffer         = VK_NULL_HANDLE;
+        bool            recording      = false;
+        bool            submitted      = false;
+        bool            in_render_pass = false;
         // Pipeline layout of the most recently bound pipeline; captured at
         // `cmd_bind_pipeline` so subsequent `cmd_bind_group` / `cmd_push_constants`
         // calls can use it without crossing back through the abstract API.
@@ -157,6 +167,11 @@ namespace rover
 
         CommandListHandle begin_command_list() override;
         void              end_command_list(CommandListHandle cmd) override;
+
+        bool cmd_resource_barriers(CommandListHandle               cmd,
+                                   std::span<const BufferBarrier>  buffers,
+                                   std::span<const TextureBarrier> textures) override;
+        bool cmd_copy_texture_to_buffer(CommandListHandle cmd, TextureHandle texture, BufferHandle buffer) override;
 
         void cmd_begin_render_pass(CommandListHandle cmd,
                                    FramebufferHandle fb,
@@ -250,6 +265,7 @@ namespace rover
 
         std::vector<TextureHandle>     swapchain_texture_handles_;
         std::vector<CommandListHandle> frame_command_lists_;
+        CommandListHandle              active_command_list_ = INVALID_HANDLE;
 
         bool in_frame_        = false;
         bool swapchain_dirty_ = false;

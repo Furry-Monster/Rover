@@ -22,6 +22,7 @@
 #include "core/graphics/graphics.h"
 #include "core/log/log.h"
 #include "drivers/vulkan/register_types.h"
+#include "main/frame_graph_demo.h"
 #include "main/mesh_demo.h"
 #include "platform/linux/event_pump.h"
 #include "platform/linux/linux_platform.h"
@@ -164,7 +165,11 @@ namespace rover
         }
     }
 
-    static int run_triangle_demo(GraphicsDevice& device, Window& window, EventPump& pump, TimeSource& time)
+    static int run_triangle_demo(GraphicsDevice& device,
+                                 Window&         window,
+                                 EventPump&      pump,
+                                 TimeSource&     time,
+                                 u32             frame_limit)
     {
         TriangleDemo demo{};
         if (!create_triangle_resources(device, demo))
@@ -175,7 +180,8 @@ namespace rover
         rebuild_triangle_framebuffers(device, demo);
         ROVER_LOG_INFO("Triangle demo ready; entering main loop");
 
-        while (!window.should_close())
+        u32 rendered_frames = 0;
+        while (!window.should_close() && (frame_limit == 0 || rendered_frames < frame_limit))
         {
             pump.poll();
             time.tick();
@@ -224,6 +230,7 @@ namespace rover
             device.end_command_list(cmd);
             device.end_frame();
             device.present();
+            ++rendered_frames;
         }
 
         device.wait_idle();
@@ -268,7 +275,11 @@ namespace rover
         int rc = 0;
         if (demo_name == "triangle")
         {
-            rc = run_triangle_demo(*device, window, pump, time);
+            rc = run_triangle_demo(*device, window, pump, time, frame_limit);
+        }
+        else if (demo_name == "frame-graph")
+        {
+            rc = run_frame_graph_demo(*device, window, pump, frame_limit);
         }
         else
         {
@@ -288,9 +299,10 @@ namespace rover
             const std::string_view arg = argv[i];
             if (arg == "--help")
             {
-                std::puts("Usage: rover [--demo mesh|triangle] [--scene path] [--frames positive-count]\n"
+                std::puts("Usage: rover [--demo mesh|triangle|frame-graph] [--scene path] [--frames positive-count]\n"
                           "Mesh demo creates the scene only when missing, then loads it for rendering.\n"
-                          "Default scene: demo.rscene. --frames applies to the mesh demo.");
+                          "Default scene: demo.rscene. --frames applies to all demos.\n"
+                          "frame-graph verifies offscreen GPU readback (default: 8 frames).");
                 return 0;
             }
             if ((arg != "--demo" && arg != "--scene" && arg != "--frames") || i + 1 >= argc)
@@ -301,7 +313,7 @@ namespace rover
             const std::string_view value = argv[++i];
             if (arg == "--demo")
             {
-                if (value != "mesh" && value != "triangle")
+                if (value != "mesh" && value != "triangle" && value != "frame-graph")
                 {
                     std::fprintf(stderr, "Unknown demo: %s\n", argv[i]);
                     return 1;
@@ -327,12 +339,6 @@ namespace rover
                 }
             }
         }
-        if (demo_name == "triangle" && frame_limit != 0)
-        {
-            std::fputs("--frames is supported by the mesh demo only\n", stderr);
-            return 1;
-        }
-
         register_core_types();
 
         ROVER_LOG_INFO("{} {}", ROVER_VERSION_NAME, ROVER_VERSION_STRING);

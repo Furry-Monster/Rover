@@ -18,7 +18,7 @@ namespace rover
     //   - Resources are imported (no transient allocation).
     //   - Each resource has at most one writer; reads depend on that writer.
     //   - Independent ready passes use registration order as a tie breaker.
-    //   - No automatic GPU barriers or layout transitions are generated.
+    //   - Resource usages compile into barriers; drivers track physical state.
     // Graph authoring/execution is single-threaded; execution forbids mutation.
     // ---------------------------------------------------------------------------
     class FrameGraph
@@ -46,6 +46,10 @@ namespace rover
 
         [[nodiscard]] const RenderResource& resource(RenderResourceId id) const;
 
+        // Export a resource for a subsequent GPU use or CPU readback. HostRead
+        // additionally requires GPU completion before mapping on the CPU.
+        void set_final_access(RenderResourceId id, ResourceAccess access);
+
         // ---- Pass registration ----
 
         // Adds a pass. `setup` is called immediately (records reads/writes);
@@ -69,7 +73,9 @@ namespace rover
         // Records all passes onto the device. Each pass gets its own command
         // list. Caller is responsible for calling `device.begin_frame()` before
         // and `device.end_frame() / present()` after.
-        void execute(GraphicsDevice& device);
+        // False stops recording downstream passes/exports; submitted work is not
+        // rolled back. Callbacks must handle their own command failures.
+        bool execute(GraphicsDevice& device);
 
         // Discards all per-frame state (resources + passes). Call between frames.
         void reset();
@@ -85,20 +91,29 @@ namespace rover
         // Prerequisite pass IDs indexed by registration ID; empty without a plan.
         [[nodiscard]] const std::vector<std::vector<u32>>& dependencies() const { return dependencies_; }
 
+        [[nodiscard]] const std::vector<std::vector<RenderResourceBarrier>>& barriers() const { return barriers_; }
+
+        [[nodiscard]] const std::vector<RenderResourceBarrier>& final_barriers() const { return final_barriers_; }
+
     private:
         friend class PassBuilder;
 
         bool prepare_mutation();
         void invalidate();
-        void declare_access(u32 pass_index, RenderResourceId id, bool write);
+        void declare_access(u32 pass_index, RenderResourceId id, ResourceAccess access, bool write);
+        bool record_barriers(GraphicsDevice&                           device,
+                             CommandListHandle                         cmd,
+                             const std::vector<RenderResourceBarrier>& barriers) const;
 
-        std::vector<RenderResource>   resources_;
-        std::vector<RenderPassNode>   passes_;
-        std::vector<u32>              execution_order_;
-        std::vector<std::vector<u32>> dependencies_;
-        bool                          compiled_          = false;
-        bool                          executing_         = false;
-        bool                          declaration_error_ = false;
+        std::vector<RenderResource>                     resources_;
+        std::vector<RenderPassNode>                     passes_;
+        std::vector<u32>                                execution_order_;
+        std::vector<std::vector<u32>>                   dependencies_;
+        std::vector<std::vector<RenderResourceBarrier>> barriers_;
+        std::vector<RenderResourceBarrier>              final_barriers_;
+        bool                                            compiled_          = false;
+        bool                                            executing_         = false;
+        bool                                            declaration_error_ = false;
     };
 
 } // namespace rover

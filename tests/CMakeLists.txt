@@ -20,6 +20,12 @@ target_link_libraries(rover_tests
         Rover::Doctest
 )
 
+# Pure Vulkan access-scope tests use only headers, never initialize a GPU.
+if (ROVER_VULKAN)
+    target_link_libraries(rover_tests PRIVATE Rover::Vulkan)
+    target_compile_definitions(rover_tests PRIVATE ROVER_TEST_VULKAN_SYNC=1)
+endif ()
+
 target_include_directories(rover_tests
     PRIVATE
         "${ROVER_ROOT_DIR}"

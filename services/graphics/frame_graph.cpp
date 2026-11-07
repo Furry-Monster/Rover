@@ -11,16 +11,38 @@
 namespace rover
 {
 
+    namespace
+    {
+        bool supports_access(const RenderResource& resource, ResourceAccess access)
+        {
+            if (resource.kind == ResourceKind::Buffer)
+            {
+                return resource_access_supports_buffer(access);
+            }
+            const bool depth = resource.format == Format::D32_SFLOAT || resource.format == Format::D24_UNORM_S8_UINT ||
+                               resource.format == Format::D32_SFLOAT_S8_UINT;
+            if (access == ResourceAccess::DepthStencilAttachment)
+            {
+                return depth;
+            }
+            if (access == ResourceAccess::ColorAttachment)
+            {
+                return !depth && resource.format != Format::UNDEFINED;
+            }
+            return resource_access_supports_texture(access);
+        }
+    } // namespace
+
     PassBuilder::PassBuilder(FrameGraph& graph, u32 pass_index) : graph_(graph), pass_index_(pass_index) {}
 
-    void PassBuilder::read(RenderResourceId id)
+    void PassBuilder::read(RenderResourceId id, ResourceAccess access)
     {
-        graph_.declare_access(pass_index_, id, false);
+        graph_.declare_access(pass_index_, id, access, false);
     }
 
-    void PassBuilder::write(RenderResourceId id)
+    void PassBuilder::write(RenderResourceId id, ResourceAccess access)
     {
-        graph_.declare_access(pass_index_, id, true);
+        graph_.declare_access(pass_index_, id, access, true);
     }
 
     void FrameGraph::invalidate()
@@ -28,6 +50,8 @@ namespace rover
         compiled_ = false;
         execution_order_.clear();
         dependencies_.clear();
+        barriers_.clear();
+        final_barriers_.clear();
     }
 
     bool FrameGraph::prepare_mutation()
@@ -41,7 +65,7 @@ namespace rover
         return true;
     }
 
-    void FrameGraph::declare_access(u32 pass_index, RenderResourceId id, bool write)
+    void FrameGraph::declare_access(u32 pass_index, RenderResourceId id, ResourceAccess access, bool write)
     {
         if (!prepare_mutation())
         {
@@ -57,6 +81,14 @@ namespace rover
         if (std::find(accesses.begin(), accesses.end(), id) == accesses.end())
         {
             accesses.push_back(id);
+        }
+        auto&      uses      = passes_[pass_index].accesses;
+        const auto duplicate = std::find_if(uses.begin(), uses.end(), [&](const auto& use) {
+            return use.resource == id && use.usage == access && use.write == write;
+        });
+        if (duplicate == uses.end())
+        {
+            uses.push_back({id, access, write});
         }
     }
 
@@ -103,6 +135,21 @@ namespace rover
     {
         static const RenderResource invalid{};
         return id < resources_.size() ? resources_[id] : invalid;
+    }
+
+    void FrameGraph::set_final_access(RenderResourceId id, ResourceAccess access)
+    {
+        if (!prepare_mutation())
+        {
+            return;
+        }
+        if (id >= resources_.size())
+        {
+            ROVER_LOG_ERROR("FrameGraph: final access declaration for invalid resource {}", id);
+            declaration_error_ = true;
+            return;
+        }
+        resources_[id].final_access = access;
     }
 
     u32 FrameGraph::add_pass(std::string name, PassSetupFn setup, PassExecuteFn execute)
@@ -220,6 +267,7 @@ namespace rover
             {
                 const auto target = pass.color_attachment;
                 if (target >= resources_.size() || resources_[target].kind != ResourceKind::Texture ||
+                    !supports_access(resources_[target], ResourceAccess::ColorAttachment) ||
                     resources_[target].framebuffer == INVALID_HANDLE)
                 {
                     ROVER_LOG_ERROR("FrameGraph: pass '{}' has an invalid color attachment {}", pass.name, target);
@@ -303,25 +351,108 @@ namespace rover
             }
             return false;
         }
+        std::vector<std::vector<RenderResourceBarrier>> barriers(passes_.size());
+        std::vector<RenderResourceBarrier>              final_barriers;
+        std::vector<ResourceAccess>                     states(resources_.size(), ResourceAccess::Undefined);
+        for (auto pass_id : order)
+        {
+            const auto&                 pass = passes_[pass_id];
+            std::vector<ResourceAccess> uses(resources_.size(), ResourceAccess::Undefined);
+            for (const auto& use : pass.accesses)
+            {
+                // Resource IDs were checked when building the dependency graph.
+                auto access = use.usage;
+                if (use.write && access == ResourceAccess::Automatic)
+                {
+                    access = pass.has_clear && use.resource == pass.color_attachment ? ResourceAccess::ColorAttachment
+                                                                                     : ResourceAccess::StorageWrite;
+                }
+                const auto& res        = resources_[use.resource];
+                const bool  kind_valid = supports_access(res, access);
+                const bool  mode_valid = use.write ? resource_access_is_write(access) : resource_access_is_read(access);
+                if (!kind_valid || !mode_valid || access == ResourceAccess::HostRead ||
+                    access == ResourceAccess::HostWrite)
+                {
+                    ROVER_LOG_ERROR("FrameGraph: pass '{}' declares incompatible access {} for resource '{}'",
+                                    pass.name,
+                                    static_cast<u32>(access),
+                                    res.name);
+                    return false;
+                }
+                if (uses[use.resource] != ResourceAccess::Undefined && uses[use.resource] != access)
+                {
+                    ROVER_LOG_ERROR(
+                        "FrameGraph: pass '{}' uses resource '{}' with conflicting usages", pass.name, res.name);
+                    return false;
+                }
+                uses[use.resource] = access;
+            }
+            if (pass.has_clear)
+            {
+                auto& access = uses[pass.color_attachment];
+                if (access != ResourceAccess::Undefined && access != ResourceAccess::ColorAttachment)
+                {
+                    ROVER_LOG_ERROR("FrameGraph: pass '{}' declares a non-color use for its color attachment",
+                                    pass.name);
+                    return false;
+                }
+                access = ResourceAccess::ColorAttachment;
+            }
+            for (RenderResourceId id = 0; id < uses.size(); ++id)
+            {
+                const auto access = uses[id];
+                if (access == ResourceAccess::Undefined)
+                {
+                    continue;
+                }
+                if (states[id] != access || resource_access_is_write(states[id]) || resource_access_is_write(access))
+                {
+                    barriers[pass_id].push_back({id, states[id], access});
+                }
+                states[id] = access;
+            }
+        }
+        for (RenderResourceId id = 0; id < resources_.size(); ++id)
+        {
+            const auto& res    = resources_[id];
+            const auto  access = res.final_access;
+            if (access == ResourceAccess::Undefined)
+            {
+                continue;
+            }
+            const bool valid = supports_access(res, access);
+            if (!valid)
+            {
+                ROVER_LOG_ERROR("FrameGraph: incompatible final access for resource '{}'", res.name);
+                return false;
+            }
+            if (states[id] != access || resource_access_is_write(states[id]) || resource_access_is_write(access))
+            {
+                final_barriers.push_back({id, states[id], access});
+            }
+        }
         dependencies_    = std::move(dependencies);
         execution_order_ = std::move(order);
+        barriers_        = std::move(barriers);
+        final_barriers_  = std::move(final_barriers);
         compiled_        = true;
         return true;
     }
 
-    void FrameGraph::execute(GraphicsDevice& device)
+    bool FrameGraph::execute(GraphicsDevice& device)
     {
         if (executing_)
         {
             ROVER_LOG_ERROR("FrameGraph: recursive execution is unsupported");
-            return;
+            return false;
         }
         if (!compiled_)
         {
             ROVER_LOG_WARN("FrameGraph::execute requires a successful compile() after graph changes");
-            return;
+            return false;
         }
-        executing_ = true;
+        executing_     = true;
+        bool succeeded = true;
         for (auto pass_id : execution_order_)
         {
             const auto&             pass = passes_[pass_id];
@@ -329,6 +460,15 @@ namespace rover
             if (cmd == INVALID_HANDLE)
             {
                 ROVER_LOG_WARN("FrameGraph: failed to open command list for pass '{}'; stopping execution", pass.name);
+                succeeded = false;
+                break;
+            }
+
+            if (!record_barriers(device, cmd, barriers_[pass_id]))
+            {
+                ROVER_LOG_ERROR("FrameGraph: failed to synchronize pass '{}'; stopping execution", pass.name);
+                device.end_command_list(cmd);
+                succeeded = false;
                 break;
             }
 
@@ -357,7 +497,51 @@ namespace rover
             }
             device.end_command_list(cmd);
         }
+        if (succeeded && !final_barriers_.empty())
+        {
+            const auto cmd = device.begin_command_list();
+            if (cmd != INVALID_HANDLE)
+            {
+                if (!record_barriers(device, cmd, final_barriers_))
+                {
+                    ROVER_LOG_ERROR("FrameGraph: failed to synchronize exported resources");
+                    succeeded = false;
+                }
+                device.end_command_list(cmd);
+            }
+            else
+            {
+                ROVER_LOG_ERROR("FrameGraph: failed to open export command list");
+                succeeded = false;
+            }
+        }
         executing_ = false;
+        return succeeded;
+    }
+
+    bool FrameGraph::record_barriers(GraphicsDevice&                           device,
+                                     CommandListHandle                         cmd,
+                                     const std::vector<RenderResourceBarrier>& barriers) const
+    {
+        if (barriers.empty())
+        {
+            return true;
+        }
+        std::vector<BufferBarrier>  buffers;
+        std::vector<TextureBarrier> textures;
+        for (const auto& barrier : barriers)
+        {
+            const auto& res = resources_[barrier.resource];
+            if (res.kind == ResourceKind::Texture)
+            {
+                textures.push_back({res.texture, barrier.after});
+            }
+            else
+            {
+                buffers.push_back({res.buffer, barrier.after});
+            }
+        }
+        return device.cmd_resource_barriers(cmd, buffers, textures);
     }
 
     void FrameGraph::reset()

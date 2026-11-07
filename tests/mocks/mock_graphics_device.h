@@ -14,6 +14,15 @@ namespace rover
     public:
         std::vector<std::string> events;
 
+        struct BarrierBatch
+        {
+            std::vector<BufferBarrier>  buffers;
+            std::vector<TextureBarrier> textures;
+        };
+
+        std::vector<BarrierBatch> barrier_batches;
+        bool                      barriers_succeed = true;
+
         bool init(WindowSystem&) override { return true; }
 
         void shutdown() override {}
@@ -73,6 +82,21 @@ namespace rover
         }
 
         void end_command_list(CommandListHandle) override { events.emplace_back("end_cmd"); }
+
+        bool cmd_resource_barriers(CommandListHandle,
+                                   std::span<const BufferBarrier>  buffers,
+                                   std::span<const TextureBarrier> textures) override
+        {
+            events.emplace_back("barriers");
+            barrier_batches.push_back({{buffers.begin(), buffers.end()}, {textures.begin(), textures.end()}});
+            return barriers_succeed;
+        }
+
+        bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle) override
+        {
+            events.emplace_back("copy_texture_to_buffer");
+            return true;
+        }
 
         void cmd_begin_render_pass(CommandListHandle, FramebufferHandle, const ClearValue*, u32) override
         {

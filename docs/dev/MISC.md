@@ -1,6 +1,6 @@
 # Rover 引擎 Misc Tooling 文档
 
-> **权威文档** — 对 `misc/` 下任何工具脚本的修改都 **必须** 同步更新本文档。修改前请先阅读本文档了解现有设计。
+本文说明 `misc/` 的构建工具、命令和扩展方式。修改工具命令或行为时同步更新对应章节。
 
 ---
 
@@ -37,7 +37,7 @@
 | `misc/cmake/` | 项目级 CMake 模块（构建选项、编译标志、辅助函数、shader 编译） |
 | `misc/scripts/` | Python 开发者 CLI（`rover-cli`），统一封装 cmake / ninja / gdb / clang-format 等日常工作流 |
 
-这是一个 **可维护的工程工具集**，不是一次性的脚本拼凑。`misc/scripts/` 是结构化的 Python 包：
+`misc/scripts/` 按入口、共享模块和子命令组织 Python 包：
 
 - 单一入口（`rover-cli` 可执行文件）+ 子命令模式
 - 共享基础设施（路径发现、日志、子进程、Vulkan SDK 检测）

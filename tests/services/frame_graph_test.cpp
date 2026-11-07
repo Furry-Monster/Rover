@@ -39,9 +39,8 @@ TEST_CASE("FrameGraph: producer executes before its consumer")
     fg.execute(dev);
 
     CHECK(order == std::vector<int>{1, 2});
-    // Each pass: begin_cmd + execute + end_cmd (no begin_pass since
-    // framebuffer wasn't set on either pass).
-    CHECK(dev.events.size() == 4);
+    CHECK(dev.events ==
+          std::vector<std::string>{"begin_cmd", "barriers", "end_cmd", "begin_cmd", "barriers", "end_cmd"});
 }
 
 TEST_CASE("FrameGraph: set_color_attachment wraps execute with render pass")
@@ -58,11 +57,7 @@ TEST_CASE("FrameGraph: set_color_attachment wraps execute with render pass")
     MockGraphicsDevice dev;
     fg.execute(dev);
 
-    REQUIRE(dev.events.size() == 4);
-    CHECK(dev.events[0] == "begin_cmd");
-    CHECK(dev.events[1] == "begin_pass");
-    CHECK(dev.events[2] == "end_pass");
-    CHECK(dev.events[3] == "end_cmd");
+    CHECK(dev.events == std::vector<std::string>{"begin_cmd", "barriers", "begin_pass", "end_pass", "end_cmd"});
 }
 
 TEST_CASE("FrameGraph: compile fails when a pass references a bad resource id")
@@ -83,6 +78,8 @@ TEST_CASE("FrameGraph: reset clears resources and passes")
     CHECK(fg.resource_count() == 0);
     CHECK(fg.execution_order().empty());
     CHECK(fg.dependencies().empty());
+    CHECK(fg.barriers().empty());
+    CHECK(fg.final_barriers().empty());
     REQUIRE(fg.compile());
     MockGraphicsDevice dev;
     fg.execute(dev);
@@ -135,8 +132,15 @@ TEST_CASE("FrameGraph: reverse registered chain executes producer data through a
     MockGraphicsDevice dev;
     fg.execute(dev);
     CHECK(order == std::vector<int>{1, 2, 3});
-    CHECK(dev.events ==
-          std::vector<std::string>{"begin_cmd", "end_cmd", "begin_cmd", "end_cmd", "begin_cmd", "end_cmd"});
+    CHECK(dev.events == std::vector<std::string>{"begin_cmd",
+                                                 "barriers",
+                                                 "end_cmd",
+                                                 "begin_cmd",
+                                                 "barriers",
+                                                 "end_cmd",
+                                                 "begin_cmd",
+                                                 "barriers",
+                                                 "end_cmd"});
 }
 
 TEST_CASE("FrameGraph: diamond dependencies and shared reads are deterministic")
@@ -347,6 +351,10 @@ TEST_CASE("FrameGraph: every authoring mutation invalidates the execution plan")
     {
         fg.set_color_attachment(0, color, {});
     }
+    SUBCASE("final access declaration")
+    {
+        fg.set_final_access(color, ResourceAccess::ShaderRead);
+    }
     CHECK(fg.execution_order().empty());
     CHECK(fg.dependencies().empty());
     MockGraphicsDevice dev;
@@ -384,7 +392,8 @@ TEST_CASE("FrameGraph: attachment writes create dependencies without explicit wr
     MockGraphicsDevice dev;
     fg.execute(dev);
     CHECK(dev.events ==
-          std::vector<std::string>{"begin_cmd", "begin_pass", "end_pass", "end_cmd", "begin_cmd", "end_cmd"});
+          std::vector<std::string>{
+              "begin_cmd", "barriers", "begin_pass", "end_pass", "end_cmd", "begin_cmd", "barriers", "end_cmd"});
 }
 
 TEST_CASE("FrameGraph: replacing an attachment removes only its implicit write")
@@ -517,6 +526,7 @@ TEST_CASE("FrameGraph: mutation and reentry during execution are rejected withou
         fg.set_color_attachment(0, color, {});
         CHECK_FALSE(fg.compile());
         fg.execute(ctx.device);
+        fg.set_final_access(color, ResourceAccess::ShaderRead);
     });
     fg.add_pass("following", {}, [&](PassExecuteContext&) { ++executed; });
     REQUIRE(fg.compile());
@@ -529,6 +539,7 @@ TEST_CASE("FrameGraph: mutation and reentry during execution are rejected withou
     CHECK(fg.passes()[0].reads.empty());
     CHECK(fg.passes()[0].writes.empty());
     CHECK_FALSE(fg.passes()[0].has_clear);
+    CHECK(fg.resource(color).final_access == ResourceAccess::Undefined);
     CHECK(dev.events == std::vector<std::string>{"begin_cmd", "end_cmd", "begin_cmd", "end_cmd"});
     fg.reset();
     CHECK(fg.pass_count() == 0);
@@ -568,7 +579,7 @@ TEST_CASE("FrameGraph: command list failure stops downstream execution and permi
     REQUIRE(fg.compile());
     fg.execute(dev);
     CHECK(executed == std::vector<int>{1});
-    CHECK(dev.events == std::vector<std::string>{"begin_cmd", "end_cmd", "failed_cmd"});
+    CHECK(dev.events == std::vector<std::string>{"begin_cmd", "barriers", "end_cmd", "failed_cmd"});
     executed.clear();
     fg.execute(dev);
     CHECK(executed == std::vector<int>{1, 2, 3});

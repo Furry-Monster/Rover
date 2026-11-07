@@ -1,6 +1,6 @@
 # Rover 引擎 Core 子系统文档
 
-> **权威文档** — 对 `core/` 的任何修改都 **必须** 同步更新本文档。修改前请先阅读本文档了解现有设计。
+本文说明 `core/` 的类型、子系统和抽象接口。修改核心接口或行为时同步更新对应章节。
 
 ---
 
@@ -614,19 +614,27 @@ using StringName = std::string;
 
 ```cpp
 enum class PropertyType : u8 {
-    Bool, Int, Float, String,
-    Vector2, Vector3, Vector4, Quat, Mat4,
-    Object, Unknown
+    Nil = 0, Bool, Int, Float, String,
+    Vector2, Vector3, Vector4, Quat, Mat4, Color,
+    Object, Array, Dictionary, Unknown = 0xFF
 };
+
+using PropertyGetter = std::function<Variant(const Object*)>;
+using PropertySetter = std::function<void(Object*, const Variant&)>;
 
 struct PropertyInfo {
     StringName   name;
     PropertyType type = PropertyType::Unknown;
     StringName   hint;
+    PropertyGetter getter;
+    PropertySetter setter;
+
+    bool readable() const noexcept;
+    bool writable() const noexcept;
 };
 ```
 
-用于反射系统中描述属性元数据。当前仅声明，属性绑定功能将在后续迭代中实现。
+`PropertyInfo` 保存属性元数据及读写回调，供反射和序列化使用。getter 接收 `const Object*` 并返回 Variant；setter 接收 `Object*` 与 Variant。`readable()` / `writable()` 查询对应回调是否存在。
 
 ### 9.4 Object — `object.h`
 
@@ -686,14 +694,21 @@ struct ClassInfo {
     StringName name;
     StringName parent_name;
     ObjectFactory factory;                            // std::function<Object*()>
-    std::unordered_map<StringName, PropertyInfo> properties;
+    std::vector<PropertyInfo> property_order;
+    std::unordered_map<StringName, std::size_t> property_index;
 };
 
 class ClassDB {
+public:
     static void register_class(const StringName& name, const StringName& parent,
                                ObjectFactory factory);
     template<typename T>
     static void register_class();                     // 自动提取类名和工厂
+
+    static bool register_property(const StringName& class_name, PropertyInfo info);
+    static const PropertyInfo* find_property(const StringName& class_name,
+                                              const StringName& property_name);
+    static const std::vector<PropertyInfo>* list_properties(const StringName& class_name);
 
     static Object* instantiate(const StringName& class_name);
     static bool class_exists(const StringName& name);
@@ -705,6 +720,8 @@ class ClassDB {
 - **全静态类**（`= delete` 构造函数）
 - 内部使用 Meyer's singleton：`static std::unordered_map<StringName, ClassInfo>& get_registry()`
 - `register_class<T>()` 模板自动调用 `T::get_class_name_static()` 和 `T::get_parent_class_name_static()`
+- `register_property()` 按插入顺序保存属性，同名属性替换原项；类名未知时返回 `false`
+- `find_property()` 与 `list_properties()` 查询当前类自身的属性，继承属性由调用方按类链查询
 - `is_parent_class()` 通过遍历 `parent_name` 链实现继承关系检查
 - 重复注册会触发 assert
 
@@ -858,6 +875,9 @@ public:
     // 命令录制
     virtual CommandListHandle begin_command_list() = 0;
     virtual void              end_command_list(CommandListHandle) = 0;
+    virtual bool cmd_resource_barriers(CommandListHandle, std::span<const BufferBarrier>,
+                                        std::span<const TextureBarrier>) = 0;
+    virtual bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle) = 0;
     virtual void cmd_begin_render_pass(CommandListHandle, FramebufferHandle,
                                        const ClearValue*, u32 count) = 0;
     virtual void cmd_end_render_pass(CommandListHandle) = 0;
@@ -896,6 +916,10 @@ public:
 ```
 
 ### 10.7 伞形头文件 — `graphics.h`
+
+同步契约见 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。`ResourceAccess` 区分 shader/storage、颜色/深度附件、transfer、vertex/index/uniform/indirect、HostRead/HostWrite 和 Present。barrier 描述只指定目标用途，驱动从持续状态推导源布局/访问范围。`cmd_resource_barriers` 必须在 render pass 外调用，整批先验证再记录；`false` 表示未记录该批转换。每次只允许一个命令列表处于录制中，并按录制顺序提交。
+
+`cmd_copy_texture_to_buffer` 只接受已处于 TransferRead/TransferWrite 的资源；支持单 mip、单层二维 RGBA8，紧密排列且从缓冲偏移 0 写入。缓冲导出到 HostRead 后，调用方须等待 GPU 完成，再 map 读取。新资源 Undefined 状态禁止首读；CPU 写入通过 `update_buffer` 维护 HostWrite，直接映射写入仍由调用方负责可见性与生命周期。
 
 ```cpp
 #include "core/graphics/graphics_types.h"

@@ -1,10 +1,10 @@
 # 调试与异常处理规范
 
-> 本规范统一 Rover 引擎在 **错误处理**、**日志**、**断言**、**调试开关**、**Sanitizer**、**GPU 验证层** 等方面的约束。
+本规范说明错误返回、日志级别、断言、Sanitizer 和 GPU 验证层的使用要求。
 
 ---
 
-## 1. 错误处理风格（强制）
+## 1. 错误处理风格
 
 Rover 引擎 **不使用 C++ 异常**。所有可失败操作必须使用以下方式之一：
 
@@ -28,13 +28,13 @@ bool init() { return some_call() == 0; }   // 失败后无任何痕迹
 if (!init()) std::exit(1);
 ```
 
-### 失败时的最低义务
+### 失败处理步骤
 
-任何返回 `false` / `INVALID_HANDLE` 的失败路径**必须**：
+返回 `false` 或 `INVALID_HANDLE` 的失败路径必须完成以下步骤：
 
 1. 调用 `ROVER_LOG_ERROR(...)` 说明失败原因（含上下文）
-2. 不留下半初始化的状态（已分配的资源必须清理）
-3. 让调用方有机会决定如何处理（不直接 `exit()`）
+2. 清理已分配资源，恢复可重试或可析构的状态
+3. 返回失败，由调用方决定恢复、向上传递或终止；失败路径禁止直接 `exit()`
 
 ```cpp
 // ✅ 正确
@@ -59,7 +59,7 @@ bool VkInstanceWrapper::init(const std::vector<const char*>& exts, bool validati
 
 ---
 
-## 2. 日志规范（强制）
+## 2. 日志规范
 
 ### 2.1 双通道
 
@@ -68,7 +68,7 @@ bool VkInstanceWrapper::init(const std::vector<const char*>& exts, bool validati
 | `Rover` | `ROVER_LOG_*` | 引擎内部日志（core / drivers / platform / services / modules） |
 | `App` | `ROVER_APP_*` | 游戏 / 应用层日志（用户代码用） |
 
-第一方代码 **永远** 用 `ROVER_LOG_*`。`ROVER_APP_*` 仅供下游用户。
+第一方代码使用 `ROVER_LOG_*`，下游应用代码使用 `ROVER_APP_*`。
 
 ### 2.2 级别选择
 

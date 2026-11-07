@@ -467,6 +467,8 @@ namespace rover
 
             auto color_id = fg.import_texture(
                 "color", current_tex, device.get_swapchain_format(), demo.fb_width, demo.fb_height, fb_it->second);
+            auto depth_id =
+                fg.import_texture("depth", demo.depth_texture, Format::D32_SFLOAT, demo.fb_width, demo.fb_height);
             ClearValue clear{};
             clear.color[0] = 0.05f;
             clear.color[1] = 0.07f;
@@ -476,7 +478,10 @@ namespace rover
 
             const u32 forward_idx = fg.add_pass(
                 "forward",
-                [&](PassBuilder& b) { b.write(color_id); },
+                [&](PassBuilder& b) {
+                    b.write(color_id);
+                    b.write(depth_id, ResourceAccess::DepthStencilAttachment);
+                },
                 [&](PassExecuteContext& ctx) {
                     ctx.device.cmd_bind_pipeline(ctx.cmd, demo.pipeline);
                     Viewport vp{};

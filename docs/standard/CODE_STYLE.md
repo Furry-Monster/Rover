@@ -1,14 +1,14 @@
 # 代码风格
 
-> 本规范是 Rover 引擎第一方 C++ 代码必须遵守的风格。命名约定独立见 [`NAMING.md`](NAMING.md)。
+本规范适用于第一方 C++ 代码，命名规则见 [NAMING](NAMING.md)，文档规则见 [DOCUMENTATION](DOCUMENTATION.md)。
 
 ---
 
 ## 1. 总则
 
 - **C++ 标准**：C++20。允许使用 `concepts`、`<ranges>`、`<bit>`、`std::jthread`、designated initializers
-- **格式化**：由 [`.clang-format`](../../.clang-format) 强制执行；提交前必须通过 `./misc/scripts/rover-cli format --check`
-- **静态检查**：由 [`.clang-tidy`](../../.clang-tidy) 强制执行；CI 计划开启 `--werror` 模式
+- **格式化**：使用 [`.clang-format`](../../.clang-format)，提交前通过 `./misc/scripts/rover-cli format --check`
+- **静态检查配置**：[`.clang-tidy`](../../.clang-tidy)；CI 的 `--werror` 检查列为后续工作
 - **每行最大长度**：120
 - **缩进**：4 spaces，不用 tab
 - **行尾**：LF，UTF-8，文件末尾必须有换行
@@ -122,7 +122,7 @@ bool create_pipeline(const PipelineDesc& desc, PipelineHandle* out, const char* 
 
 ## 3. include 路径规则
 
-**强制**：所有 include 使用 **仓库根相对路径**，`rover_add_library()` 已自动把 `ROVER_ROOT_DIR` 加入 `target_include_directories(... PUBLIC)`。
+所有第一方 include 必须使用仓库根相对路径，`rover_add_library()` 已把 `ROVER_ROOT_DIR` 加入 `target_include_directories(... PUBLIC)`。
 
 ```cpp
 // ✅ 正确
@@ -277,9 +277,9 @@ TextureHandle create_texture(const TextureDesc& desc) {
 
 ### 6.2 失败时的日志
 
-- 任何 `false` 返回必须先 `ROVER_LOG_ERROR(...)` 说明原因
+- 失败路径返回 `false` 前，必须用 `ROVER_LOG_ERROR(...)` 说明原因
 - Vulkan 调用必须用 `VK_CHECK*` 宏包裹
-- 不要静默失败
+- 日志包含失败操作及相关资源上下文
 
 ```cpp
 // ✅
@@ -367,8 +367,8 @@ auto x = compute_thing();
 
 ### 规则
 
-- **解释意图，不解释代码做了什么**
-- 不写废话注释（`// increment counter`、`// loop over items`）
+- 注释说明设计意图、前提和生命周期
+- 省略逐句复述代码的注释，如 `// increment counter`、`// loop over items`
 - 公共 API 头文件可以加 doxygen 风格简短说明，但当前不强制
 - TODO / FIXME / NOTE / HACK 标签请加上责任人 / 日期或上下文
 
@@ -393,9 +393,9 @@ std::vector<VkSemaphore> render_finished_semaphores_;
 
 ### 默认假设
 
-- 引擎对象**默认非线程安全**，由 JobSystem 调度协调
-- 真线程安全的类必须在文档（`docs/dev/<area>.md`）显式写明（如 `EventBus::publish`）
-- 跨线程共享的类型应使用 `std::atomic` / `std::mutex`，而非"凑巧没冲突"
+- 引擎对象默认由单线程访问，任务由 JobSystem 调度协调
+- 提供线程安全保证的类必须在 `docs/dev/<area>.md` 说明适用操作，如 `EventBus::publish`
+- 跨线程共享状态使用 `std::atomic`、`std::mutex` 等同步机制；默认对象不保证线程安全
 
 ### 反例
 

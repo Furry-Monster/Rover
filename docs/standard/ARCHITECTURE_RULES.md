@@ -1,10 +1,10 @@
 # 架构规则
 
-> 本规范定义 Rover 引擎**必须遵守**的层依赖与 include 约束。这是 [ADR-0001 三层倒置架构](../product/adr/ADR-0001-three-layer-architecture.md) 在编码层面的强制条款。当前实现快照见 [`docs/dev/ARCHITECTURE.md`](../dev/ARCHITECTURE.md)。
+本规范定义层依赖、include、接口扩展与注册顺序，依据 [ADR-0001](../product/adr/ADR-0001-three-layer-architecture.md)。当前实现见 [架构文档](../dev/ARCHITECTURE.md)。
 
 ---
 
-## 1. 分层模型（强制）
+## 1. 分层模型
 
 ```
 Layer 5  editor/                       gui + cli 编辑器接口
@@ -19,7 +19,7 @@ Layer 0  vendor/                       第三方依赖
 
 ---
 
-## 2. 依赖矩阵（强制）
+## 2. 依赖矩阵
 
 下表中 ✅ = 允许 include，❌ = 禁止 include，⚠️ = 仅运行时通过抽象指针。
 
@@ -33,7 +33,7 @@ Layer 0  vendor/                       第三方依赖
 | **editor/**     | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | **main/**       | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 
-### 2.1 关键约束（违反必拒）
+### 2.1 关键约束
 
 1. **services 不可 include 任何 driver 头文件**：要调用 GPU，只能通过 `core/graphics/graphics_device.h` 抽象
 2. **modules 不可 include 任何 driver 或 platform 头文件**：要使用平台/GPU 能力，必须经过 services 或 core
@@ -61,7 +61,7 @@ GraphicsDevice* device_;                              // 由 main/ 注入
 
 ## 3. include 路径规则
 
-**强制**：所有第一方 include 使用 **仓库根相对路径**：
+所有第一方 include 必须使用仓库根相对路径：
 
 ```cpp
 // ✅
@@ -96,6 +96,8 @@ GraphicsDevice* device_;                              // 由 main/ 注入
 3. 同步在所有现有实现（`drivers/vulkan/` 等）中实现新方法
 4. 提供合理的默认行为或明确「未实现时调用是 UB / Fatal」契约
 
+新增同步/读回接口遵循 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)：`cmd_resource_barriers` 与 `cmd_copy_texture_to_buffer` 在所有后端中实现，非法请求返回 `false`。同步作用于 graphics queue 串行记录的整个资源，不能通过默认空实现跳过 barrier。
+
 ### 4.3 接口移除规则
 
 移除已有的纯虚方法：
@@ -108,7 +110,7 @@ GraphicsDevice* device_;                              // 由 main/ 注入
 
 ## 5. 注册系统约束
 
-### 5.1 注册函数签名（强制）
+### 5.1 注册函数签名
 
 所有层 / 模块 / 驱动暴露的注册函数：
 
@@ -121,7 +123,7 @@ void unregister_<scope>_types();    // 关闭时反序调用，幂等
 
 `<scope>` 命名见 [`NAMING.md` §9](NAMING.md#9-注册函数命名)。
 
-### 5.2 注册顺序（强制）
+### 5.2 注册顺序
 
 `main/` 必须按以下顺序调用：
 
@@ -158,7 +160,7 @@ void unregister_<scope>_types();    // 关闭时反序调用，幂等
 | `PRIVATE` | 仅 `.cpp` 中使用 | `target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)` |
 | `INTERFACE` | 自身无源码（接口库） | `target_link_libraries(Rover::CompileFlags INTERFACE ...)` |
 
-**强约束**：永远不使用 `PUBLIC` 把具体 driver 暴露给上层。`drivers/vulkan/` 链接 `Rover::Vulkan` 必须是 `PRIVATE`，否则 `services/` / `modules/` 会被迫 include vulkan.h。
+具体 driver 依赖必须保持 `PRIVATE`，禁止通过 `PUBLIC` 向上层暴露。`drivers/vulkan/` 链接 `Rover::Vulkan` 使用 `PRIVATE`，使 Vulkan SDK 头文件停留在驱动层。
 
 ### 6.3 聚合 façade
 
@@ -199,7 +201,9 @@ void unregister_<scope>_types();    // 关闭时反序调用，幂等
 
 ---
 
-## 8. 严禁项清单（违反 = 拒绝合入）
+## 8. 合入检查
+
+合入前排除以下违规项：
 
 1. ❌ `services/` / `modules/` / `editor/` 中出现 `#include "drivers/.../*.h"`
 2. ❌ `services/` / `modules/` 中出现 `#include "platform/.../*.h"`
@@ -209,7 +213,7 @@ void unregister_<scope>_types();    // 关闭时反序调用，幂等
 6. ❌ 抽象接口新增纯虚方法但未在 ADR 中说明
 7. ❌ CMake target 用 `PUBLIC` 暴露 driver-specific 依赖到上层
 8. ❌ 跨同层互依赖（`drivers/vulkan/` include `drivers/d3d12/`）
-9. ❌ vendor 目录被修改（即使是为了"小修一下"也禁止；改动应通过 wrapper 在 vendor/CMakeLists.txt 实现）
+9. ❌ 直接修改 vendor 库源码；集成调整使用 `vendor/CMakeLists.txt` 或 wrapper
 10. ❌ 引入第二套构建系统（违反 [ADR-0002](../product/adr/ADR-0002-cmake-as-single-build-system.md)）
 
 ---

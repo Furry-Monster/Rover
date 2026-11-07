@@ -12,13 +12,13 @@
 
 - 所有第三方库源码（**纯源码副本**，不带 `.git/`）都在 `vendor/<libname>/`
 - 由 `vendor/CMakeLists.txt` 包装为 CMake target，对外暴露 `Rover::<Lib>` 别名（或库自身原生 target）
-- 第一方代码 **绝不** 直接 add_subdirectory 到第三方库源码目录之外的位置
+- 第一方代码禁止从 `vendor/` 之外直接 `add_subdirectory` 引入第三方源码
 
-### 1.2 添加新依赖的流程（强制）
+### 1.2 添加新依赖的流程
 
-> 架构决策：见 [ADR-0008](../product/adr/ADR-0008-vendor-manual-fetch.md)。`git submodule` / CMake `FetchContent` / `find_package` 系统库三者均**禁用**；唯一合法的引入方式是「下载源码副本到 `vendor/<libname>/` 并提交进 Rover 仓库」。
+按 [ADR-0008](../product/adr/ADR-0008-vendor-manual-fetch.md)，第三方库以源码副本下载到 `vendor/<libname>/`，随 Rover 仓库提交。禁止的集成方式见 §1.2.1。
 
-向 vendor 引入新库**必须**：
+引入新库必须完成以下步骤。manifest 和 fetch 脚本为规划工具，当前使用表中的人工下载方式；脚本命令表示工具完成后的用法。
 
 1. **写 ADR**：说明引入动机、考察过的替代方案、license 兼容性
 2. **更新本文档**的"已使用依赖"清单
@@ -39,16 +39,16 @@
 
 | 方式 | 状态 | 原因（详见 ADR-0008） |
 | -- | -- | -- |
-| `git submodule add` | ❌ 禁止 | 网络脆弱、`git clone` 不带 `--recursive` 必坑、与离线构建目标冲突 |
-| CMake `FetchContent_Declare` / `ExternalProject_Add` | ❌ 禁止 | configure 阶段联网，破坏构建确定性，缓存不进 git 历史 |
-| `find_package(<SomeSystemLib> REQUIRED)` | ❌ 禁止 | 依赖开发者本机环境，破坏 hermetic onboarding |
-| 包管理器（vcpkg / Conan / xrepo） | ❌ 禁止 | 引入第二套依赖系统，违反 ADR-0002 单一构建系统 |
+| `git submodule add` | 禁止 | 依赖额外的递归拉取步骤，与离线构建目标冲突 |
+| CMake `FetchContent_Declare` / `ExternalProject_Add` | 禁止 | configure 阶段联网，源码缓存独立于仓库历史 |
+| `find_package(<SomeSystemLib> REQUIRED)` | 禁止 | 构建依赖开发者本机安装的库 |
+| 包管理器（vcpkg / Conan / xrepo） | 禁止 | 引入第二套依赖管理流程，违反 ADR-0002 单一构建系统 |
 
-> **澄清**：本规范禁的是**构建期**对开发者机器的探测（`find_package` 触发的 SDK / 系统库探测）。运行期通过 `dlopen` / `LoadLibrary` 加载系统驱动（如 Vulkan ICD `libvulkan.so.1`）是图形 API 的固有机制，不在禁用范围。换言之：Vulkan、OpenGL 这类驱动入口的**头文件必须 vendor**，但**运行期由系统 ICD 加载**是可以接受的。
+上表约束构建期依赖获取；图形 API 头文件与运行期系统驱动的处理见 §2.3。
 
 ### 1.2.2 升级第三方库
 
-升级 = 改 manifest 中的版本号 + SHA-256 → 重跑 fetch 脚本 → diff 进 PR：
+升级记录包含版本、SHA-256、源码差异和验证结果。当前按人工下载流程更新源码；规划中的 manifest/fetch 工作流如下：
 
 1. 在分支上修改 `manifest.toml`
 2. 跑 `python misc/scripts/vendor/fetch.py <libname> --upgrade`
@@ -56,10 +56,10 @@
 4. 更新 `docs/dev/<area>.md` 中的版本号
 5. 写 commit message 标记升级原因（bug fix / 安全 / 新功能）
 
-### 1.3 修改 vendor 源码（强制禁止）
+### 1.3 vendor 源码维护
 
-- ❌ **永远不要直接修改** `vendor/<lib>/` 内的源码
-- ✅ 如需 patch：
+- 禁止直接修改 `vendor/<lib>/` 内的上游源码。
+- 集成调整按以下顺序处理：
   - 优先在 `vendor/CMakeLists.txt` 中通过 `target_compile_definitions` / `target_compile_options` 调整
   - 必要时写 wrapper（如 `vendor/<lib>_wrapper/`）封装一层
   - 极端情况下应 fork 并在文档中说明 fork 维护策略
@@ -73,7 +73,7 @@
 | 库 | 版本 / 来源 | License | 用途 | 集成方式 |
 |----|-----------|---------|------|---------|
 | **SDL3** | vendored | Zlib | 窗口 / 输入 / 计时（platform 层） | 源码副本 + `add_subdirectory` |
-| **Vulkan-Headers** | vendored（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | 当前临时由 `find_package(Vulkan)` 提供 |
+| **Vulkan-Headers** | 系统 SDK（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | `find_package(Vulkan)` |
 | **volk** | vendored | MIT | Vulkan 函数指针动态加载 | 源码副本 + `add_subdirectory` |
 | **VulkanMemoryAllocator** | vendored | MIT | GPU 内存分配（VMA） | 源码副本 + `add_subdirectory`（header-only） |
 | **EnTT** | vendored | MIT | ECS（用于 modules/scene） | 源码副本 + INTERFACE target（header-only） |
@@ -81,7 +81,7 @@
 | **ImGui** | vendored | MIT | 编辑器 GUI（待 Phase 3） | 源码副本 + 手写 STATIC target |
 | **doctest** | vendored | MIT | 单元测试框架 | 源码副本 + INTERFACE target（header-only） |
 
-¹ 当前 `vendor/CMakeLists.txt` 仍调用 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件，违反 §1.2.1。Phase 2 任务：把 `Vulkan-Headers` 源码 vendor 进 `vendor/Vulkan-Headers/` 并删除 `find_package` 调用（见 §2.3）。
+¹ 当前 `vendor/CMakeLists.txt` 通过 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件。迁移任务：把头文件源码纳入 `vendor/Vulkan-Headers/`，并删除该 `find_package` 调用。
 
 **手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（仓库无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
 
@@ -110,14 +110,14 @@ Rover 自身计划开源（具体 license 待 v1.0 决定，候选 MIT / Apache 
 - 🟡 LGPL：可链接（动态），需注意打包
 - ❌ GPL：禁止（除非有特例豁免，且记录在 ADR）
 
-### 2.3 Vulkan 处理（澄清）
+### 2.3 Vulkan 构建与运行依赖
 
 Vulkan 涉及两类入口，分别处理：
 
 - **构建期头文件**（`vulkan/vulkan.h` 等）：必须 vendor 进 `vendor/Vulkan-Headers/`，与其他库一视同仁。**禁止** `find_package(Vulkan)`。
-- **运行期加载器**（`libvulkan.so.1` / `vulkan-1.dll`）：由系统驱动栈提供，volk 通过 `dlopen` 动态加载。这是图形 API 的固有机制，不算「构建期探测系统库」，不在 ADR-0008 禁用范围内。**不**链接构建期 `Vulkan::Vulkan`，仅通过 volk 间接使用。
+- **运行期加载器**（`libvulkan.so.1` / `vulkan-1.dll`）：由系统驱动栈提供，volk 在运行期动态加载。构建时禁止链接 `Vulkan::Vulkan`，运行期通过 volk 使用系统驱动入口。
 
-Phase 2 迁移完成后，`vendor/CMakeLists.txt` 中应**完全无** `find_package` 调用。
+头文件迁移状态见当前 vendor 列表的注释。迁移完成后的 `vendor/CMakeLists.txt` 禁止调用 `find_package`。
 
 ---
 
@@ -198,7 +198,7 @@ graph LR
 | `rover_platform_linux` → `Vulkan::Headers` | **PRIVATE** | 仅 `SDL_Vulkan_CreateSurface` 内部使用 |
 | `Rover::*`（聚合 façade） → 具体 target | INTERFACE | 聚合 target 自身无源码 |
 
-**强制**：driver / platform 的第三方依赖一律 `PRIVATE`，不让 SDK 头文件透传到上层。
+driver / platform 的第三方依赖必须使用 `PRIVATE`，将 SDK 头文件隔离在实现层。
 
 ---
 
@@ -252,7 +252,7 @@ modules/
 | AudioService | core 抽象 |
 | NetworkService | core 抽象 |
 
-**强制**：服务之间**不直接** include 对方头文件。如有跨服务通信需求，通过 `core/event/EventBus` 异步通信，或在 `main/` 中显式装配依赖（少数场景）。
+服务间通信使用 `core/event/EventBus`，或在 `main/` 显式装配依赖；服务之间禁止直接 include 对方头文件。
 
 ---
 

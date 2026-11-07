@@ -62,6 +62,24 @@ namespace rover
             return;
         }
 
+        if (active_command_list_ != INVALID_HANDLE)
+        {
+            ROVER_LOG_WARN("end_frame: ending the active command list before presentation");
+            end_command_list(active_command_list_);
+        }
+        const TextureBarrier present_barrier{get_swapchain_texture(), ResourceAccess::Present};
+        const auto           present_cmd = begin_command_list();
+        if (present_cmd == INVALID_HANDLE)
+        {
+            ROVER_LOG_ERROR("end_frame: unable to record the presentation transition");
+            return;
+        }
+        if (!cmd_resource_barriers(present_cmd, {}, std::span{&present_barrier, 1}))
+        {
+            ROVER_LOG_ERROR("end_frame: presentation transition failed");
+        }
+        end_command_list(present_cmd);
+
         std::vector<VkCommandBuffer> buffers;
         buffers.reserve(frame_command_lists_.size());
         for (CommandListHandle h : frame_command_lists_)
@@ -82,7 +100,7 @@ namespace rover
         }
 
         FrameSync&           fs                  = frame_sync_[current_frame_];
-        VkPipelineStageFlags wait_stage          = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkPipelineStageFlags wait_stage          = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         VkSemaphore          render_finished_sem = swapchain_.render_finished_semaphore(current_image_);
 
         VkSubmitInfo submit{};

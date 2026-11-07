@@ -1,7 +1,10 @@
 #pragma once
 
 #include "core/graphics/graphics_desc.h"
+#include "core/graphics/graphics_sync.h"
 #include "core/graphics/window_system.h"
+
+#include <span>
 
 namespace rover
 {
@@ -56,11 +59,21 @@ namespace rover
         virtual CommandListHandle begin_command_list()                    = 0;
         virtual void              end_command_list(CommandListHandle cmd) = 0;
 
+        // Outside render passes. Drivers resolve the source from tracked state,
+        // validate the entire batch, then record it. False records no transitions.
+        virtual bool cmd_resource_barriers(CommandListHandle               cmd,
+                                           std::span<const BufferBarrier>  buffers,
+                                           std::span<const TextureBarrier> textures) = 0;
+
+        // Tightly packed mip 0 RGBA8 2D readback to offset 0. Resources must
+        // already be in TransferRead / TransferWrite; false records no copy.
+        virtual bool cmd_copy_texture_to_buffer(CommandListHandle cmd, TextureHandle texture, BufferHandle buffer) = 0;
+
         virtual void cmd_begin_render_pass(CommandListHandle cmd,
                                            FramebufferHandle fb,
                                            const ClearValue* clear_values,
-                                           u32               clear_count)     = 0;
-        virtual void cmd_end_render_pass(CommandListHandle cmd) = 0;
+                                           u32               clear_count) = 0;
+        virtual void cmd_end_render_pass(CommandListHandle cmd)           = 0;
 
         virtual void cmd_bind_pipeline(CommandListHandle cmd, PipelineHandle pipeline) = 0;
         virtual void cmd_set_viewport(CommandListHandle cmd, const Viewport& viewport) = 0;
@@ -86,7 +99,7 @@ namespace rover
         virtual void cmd_bind_index_buffer(CommandListHandle cmd,
                                            BufferHandle      buffer,
                                            IndexType         type,
-                                           usize             offset = 0)  = 0;
+                                           usize             offset = 0)   = 0;
 
         virtual void cmd_draw(CommandListHandle cmd,
                               u32               vertex_count,

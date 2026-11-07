@@ -286,11 +286,12 @@ namespace rover
         device_.shutdown();
         instance_.shutdown();
 
-        window_          = nullptr;
-        in_frame_        = false;
-        swapchain_dirty_ = false;
-        current_frame_   = 0;
-        current_image_   = 0;
+        window_              = nullptr;
+        in_frame_            = false;
+        active_command_list_ = INVALID_HANDLE;
+        swapchain_dirty_     = false;
+        current_frame_       = 0;
+        current_image_       = 0;
 
         ROVER_LOG_INFO("GraphicsDeviceVulkan shut down");
     }
@@ -338,6 +339,7 @@ namespace rover
             res.mip_levels        = 1;
             res.array_layers      = 1;
             res.owns_image        = false;
+            res.usage             = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             const TextureHandle h = textures_.add(res);
             swapchain_texture_handles_.push_back(h);
         }

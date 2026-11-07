@@ -1,6 +1,6 @@
 # Rover 引擎 Platform 子系统文档
 
-> **权威文档** — 对 `platform/` 的任何修改都 **必须** 同步更新本文档。修改前请先阅读本文档了解现有设计。
+本文说明平台层的窗口、文件系统、输入、时间和生命周期接口。修改平台接口或行为时同步更新对应章节。
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 1. 概述
 
-`platform/` 是 Rover 引擎的 **Layer 2**，提供 OS 级入口、窗口、文件系统、时间源和事件泵。当前仅 `platform/linux/` 实现完整；其他平台（Windows、macOS、Android、iOS、Web）保持桩文件，按相同协议实现即可。
+`platform/` 位于 Layer 2，提供 OS 入口、窗口、文件系统、时间源和事件泵。Linux 已实现这些接口；Windows、macOS、Android、iOS 和 Web 的桩文件用于后续平台移植。
 
 Linux 平台层基于 **SDL3** 抹平窗口与输入差异，并通过 `core/graphics/window_system.h` 中的抽象接口与 `drivers/vulkan/` 协作创建 Vulkan surface。
 
@@ -101,7 +101,7 @@ public:
 
 ### 3.3 关键实现细节
 
-- **SDL3 创建标志**：`SDL_CreateWindow(title, w, h, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE)`。注意 SDL3 的 `SDL_CreateWindow` 不再有 x/y 参数（与 SDL2 不同）。
+- **SDL3 窗口创建**：`SDL_CreateWindow(title, w, h, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE)`，参数为标题、尺寸和标志。
 - **Vulkan surface 创建**：`SDL_Vulkan_CreateSurface(window_, instance, allocator, surface)`，SDL3 签名增加了 `allocator` 参数（传 `nullptr`）。
 - **Vulkan 扩展查询**：`SDL_Vulkan_GetInstanceExtensions(&count)` 直接返回 `const char* const*`，无需中间缓冲区（与 SDL2 不同）。
 - **不可复制**：`Window` 持有唯一 `SDL_Window*` 资源，复制构造与赋值已 `delete`。
@@ -219,12 +219,12 @@ private:
 - 后续帧使用上次记录位置与当前位置之差
 - 这避免了首帧 dx/dy 异常大的问题
 
-### 5.4 SDL3 注意事项
+### 5.4 SDL3 事件字段
 
-- 事件类型枚举使用 `SDL_EVENT_*` 前缀（不是 SDL2 的 `SDL_KEYDOWN` 等）
-- 键盘事件使用 `e.key.scancode`（不是 `e.key.keysym.scancode`）
-- 鼠标按钮事件 `e.button.x/y` 是 `float`（不是 `int`）
-- `SDL_PollEvent` 返回 `bool`（SDL2 是 `int`）
+- 事件类型枚举使用 `SDL_EVENT_*` 前缀
+- 键盘扫描码位于 `e.key.scancode`
+- 鼠标按钮事件的 `e.button.x/y` 类型为 `float`
+- `SDL_PollEvent` 返回 `bool`
 
 ---
 

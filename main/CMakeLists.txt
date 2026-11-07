@@ -43,6 +43,7 @@ rover_add_shader(_main_shader_headers
 add_executable(rover
     main.cpp
     mesh_demo.cpp
+    frame_graph_demo.cpp
     ${_main_shader_headers})
 
 target_link_libraries(rover

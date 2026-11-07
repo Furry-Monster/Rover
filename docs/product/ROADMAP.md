@@ -85,7 +85,8 @@
 
 里程碑：
 - ✅ `services/graphics/`：Frame Graph（导入资源、单生产者依赖 DAG、确定性拓扑排序、循环/非法引用检查、render-pass 封装），见 [使用契约](../dev/FRAME_GRAPH.md)
-- 🎯 Frame Graph 跨 pass 自动 barrier（尚未实现，依赖排序不提供 GPU 内存可见性保证）
+- ✅ Frame Graph 单队列跨 pass 自动 barrier、资源用途与导出状态、Vulkan 持续布局跟踪；`--demo frame-graph` 验证离屏清屏/复制/HostRead 像素回读，见 [ADR-0014](adr/ADR-0014-resource-barriers.md)
+- 🎯 后续渲染：实际离屏场景采样/后处理、多写入资源版本、瞬态资源与子资源跟踪
 - ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
 - ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）

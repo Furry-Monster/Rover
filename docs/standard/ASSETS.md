@@ -288,16 +288,17 @@ public:
 
 ## 9. 现状与待办
 
-### 9.1 当前状态（v0.1）
+### 9.1 当前状态
 
-- 🚧 Shader：GLSL → SPIR-V → C 头文件已跑通；按 [ADR-0007](../product/adr/ADR-0007-shader-source-language.md) 待迁移到 Slang
-- ❌ 其他类型尚未实现
+- Shader 通过 GLSL → SPIR-V → C 头文件进入当前构建，源语言迁移依据 [ADR-0007](../product/adr/ADR-0007-shader-source-language.md)。
+- 场景使用 JSON/RBIN 序列化，内置 cube、quad、sphere 通过稳定路径恢复 GPU 缓冲，见 [场景加载](../dev/SCENE_LOADING.md)。
+- 网格生成、网格/纹理上传与内存 Asset Registry 位于 `modules/serialization/`。
+- 引擎内置资源按类型组织在 `main/builtin_assets/`，示例场景位于 `scenes/demos/`。
 
-### 9.2 Phase 2 任务
+### 9.2 后续工作
 
 - 🎯 **Shader 源语言切换到 Slang/HLSL**（ADR-0007）：把现有 `triangle.vert.glsl` / `triangle.frag.glsl` 重写为 `.slang`，`RoverShader.cmake` 切到 `slangc`
-- 🎯 [F-111](../product/REQUIREMENTS.md) 文件系统抽象 + Linux 实现
-- 🎯 [F-406](../product/REQUIREMENTS.md) modules/serialization：基础二进制 + 文本格式
+- 🎯 扩展 [F-406](../product/REQUIREMENTS.md)：外部资源 import/export 与磁盘资产注册表
 - 🎯 Texture KTX2 import 流程
 - 🎯 Model GLTF import → `.rmesh`
 

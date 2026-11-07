@@ -1,102 +1,42 @@
-# Rover 引擎文档总览
+# Rover 引擎文档
 
-> 本目录是 Rover 引擎所有非源码文档的根。每份文档都属于以下 **三类** 之一，请按需查阅。
+`docs/` 按实现、规划、规范和缺陷调查组织。初次阅读从 [架构](dev/ARCHITECTURE.md) 和 [路线图](product/ROADMAP.md) 开始；编写或修改文档时使用 [文档写作规范](standard/DOCUMENTATION.md)。
 
----
+## 按任务查阅
 
-## 我应该读哪一份？
+| 任务 | 文档 |
+|------|------|
+| 理解层级、构建目标和注册顺序 | [ARCHITECTURE](dev/ARCHITECTURE.md) |
+| 查询核心、平台和驱动 API | [CORE](dev/CORE.md)、[PLATFORM](dev/PLATFORM.md)、[DRIVERS](dev/DRIVERS.md) |
+| 加载场景与运行示例 | [SCENE_LOADING](dev/SCENE_LOADING.md)、[内置场景](../main/builtin_assets/scenes/demos/README.md) |
+| 声明渲染依赖与资源同步 | [FRAME_GRAPH](dev/FRAME_GRAPH.md) |
+| 使用构建、运行和调试工具 | [MISC](dev/MISC.md) |
+| 查询目标、需求和设计依据 | [ROADMAP](product/ROADMAP.md)、[REQUIREMENTS](product/REQUIREMENTS.md)、[ADR 索引](product/adr/INDEX.md) |
+| 编写代码与测试 | [命名](standard/NAMING.md)、[代码风格](standard/CODE_STYLE.md)、[架构约束](standard/ARCHITECTURE_RULES.md)、[测试](standard/TESTING.md) |
+| 管理错误、资源和依赖 | [调试](standard/DEBUGGING.md)、[资源](standard/ASSETS.md)、[依赖](standard/DEPENDENCIES.md) |
+| 查询已调查的缺陷 | [Debug 索引](debug/README.md) |
 
-| 我想…… | 去 |
-|--------|----|
-| 了解引擎当前实现长什么样 | [`dev/`](dev/) |
-| 了解引擎目标、规划与历史决策 | [`product/`](product/) |
-| 知道应该怎么写代码（命名、风格、约束） | [`standard/`](standard/) |
-| 第一次接触引擎，不知道从哪开始 | 先 [`dev/ARCHITECTURE.md`](dev/ARCHITECTURE.md)，再 [`product/ROADMAP.md`](product/ROADMAP.md) |
-| 查某个已记录渲染/引擎缺陷的调查结论 | [`debug/`](debug/) |
-| 运行持久化场景、修改后重启加载 | [`dev/SCENE_LOADING.md`](dev/SCENE_LOADING.md) |
-| 声明渲染依赖、编译与执行 Frame Graph | [`dev/FRAME_GRAPH.md`](dev/FRAME_GRAPH.md) |
-| 提交 PR 前自查 | [`standard/CODE_STYLE.md`](standard/CODE_STYLE.md) + [`standard/ARCHITECTURE_RULES.md`](standard/ARCHITECTURE_RULES.md) + [`standard/TESTING.md`](standard/TESTING.md) |
-| 新增一个渲染后端 / 平台 / 模块 | [`product/ROADMAP.md`](product/ROADMAP.md) 看支持矩阵 → [`dev/`](dev/) 看现有实现模板 → [`product/adr/`](product/adr/) 写决策 |
+## 目录职责
 
----
+| 目录 | 内容 | 维护方式 |
+|------|------|----------|
+| `dev/` | 当前实现、API、操作步骤和验证入口 | 随实现更新，计划单列为后续工作 |
+| `product/` | 版本目标、需求状态和架构决策 | 决策写入 ADR，需求保留稳定编号 |
+| `standard/` | 命名、风格、依赖、测试和文档规则 | 说明要求、适用条件与检查方法 |
+| `debug/` | 缺陷现象、调查证据、修复和回归记录 | 按事件归档，标明日期与状态 |
 
-## 三类文档的边界
+架构决策以已接受的 ADR 为依据，规范定义执行要求，`dev/` 记录落地情况。发现差异时核对代码与 ADR；设计变更先记录决策，再同步规范和实现说明。历史 ADR 和缺陷记录保留当时的事实，后续进展通过带日期的更新或新 ADR 关联。
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                                                                   │
-│  product/   做什么（What & Why）                                   │
-│  ├─ ROADMAP        分阶段目标与支持矩阵                            │
-│  ├─ REQUIREMENTS   功能/非功能需求清单                             │
-│  └─ adr/           架构决策记录（每个决策一份）                     │
-│                                                                   │
-│  standard/  怎么做（Rules & Conventions）                          │
-│  ├─ NAMING         命名约定                                        │
-│  ├─ CODE_STYLE     代码风格                                        │
-│  ├─ ARCHITECTURE_RULES   层依赖、include 约束                      │
-│  ├─ DEBUGGING      调试与异常处理规范                              │
-│  ├─ ASSETS         资源工作流                                      │
-│  ├─ DEPENDENCIES   vendor 与模块依赖                               │
-│  └─ TESTING        测试规范                                        │
-│                                                                   │
-│  dev/       现在长什么样（Current Implementation）                  │
-│  ├─ ARCHITECTURE   层级结构、CMake target、注册系统快照             │
-│  ├─ CORE           Layer 1 各子系统 API                            │
-│  ├─ PLATFORM       Layer 2 平台实现快照                            │
-│  ├─ DRIVERS        Layer 2 驱动实现快照                            │
-│  └─ MISC           工程工具（rover-cli、CMake 模块）                │
-│                                                                   │
-│  debug/     已调查缺陷笔记（Incident notes，非强制规范）            │
-│  └─ README + 个案 md（透视、驱动踩坑等）                           │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
-```
+## 更新对应文档
 
-**目录之间的引用方向**：
+| 改动 | 同步内容 |
+|------|----------|
+| 新增、删除或重命名源文件 | 对应 `dev/<area>.md` 的文件清单与接口说明 |
+| 新增渲染后端或平台 | `dev/DRIVERS.md` 或 `dev/PLATFORM.md`、路线图支持矩阵、新 ADR |
+| 跨层结构调整 | `dev/ARCHITECTURE.md`、`standard/ARCHITECTURE_RULES.md`、新 ADR |
+| 调整命名或风格规则 | 对应规范及说明变更原因的 ADR |
+| 新增或变更需求 | `product/REQUIREMENTS.md` 的编号、状态和目标版本 |
+| 引入第三方库 | 依赖清单、集成步骤及说明引入理由的 ADR |
+| 新增缺陷调查 | `debug/README.md` 索引与个案记录 |
 
-- `product/adr/` 的决策被 `standard/` 写成强制规则，最终落实为 `dev/` 的实现状态。
-- `dev/` 描述事实，不引申意见；意见放在 `product/`，规则放在 `standard/`。
-- `debug/` 记录已调查的缺陷与规避方式，**不**作为规范；必要时与 `dev/`、源码注释交叉引用。
-- 出现冲突时，`product/` 是 source of truth：先改 ADR，再改 standard，再改 dev。
-
----
-
-## 更新触发器
-
-| 改动 | 必须同步 |
-|------|---------|
-| 新增 / 删除 / 重命名源文件 | 对应的 `dev/<area>.md` |
-| 新增渲染后端 / 平台 | `dev/DRIVERS.md` 或 `dev/PLATFORM.md` + `product/ROADMAP.md` 支持矩阵 + 新 ADR |
-| 跨层结构调整（如新增 Layer，调整依赖关系） | `dev/ARCHITECTURE.md` + `standard/ARCHITECTURE_RULES.md` + 新 ADR |
-| 调整命名/风格规则 | `standard/NAMING.md` 或 `CODE_STYLE.md`，并把变更原因记录为 ADR |
-| 新增需求 | `product/REQUIREMENTS.md` 添加新条目（编号 + 状态） |
-| 新增第三方库 | `standard/DEPENDENCIES.md` + 解释引入理由的 ADR |
-| 新增已结案缺陷笔记 | `debug/README.md` 索引表 + 个案 `debug/*.md` |
-
-`.cursor/rules/` 已配置硬性提示，会在你触碰相关源代码时强制提醒同步对应文档。
-
----
-
-## 命名约定
-
-- 文件名：`UPPERCASE.md`（如 `NAMING.md`、`ROADMAP.md`）
-- 目录名：lowercase（如 `dev/`、`product/`、`standard/`、`adr/`）
-- ADR 文件：`ADR-NNNN-kebab-case-slug.md`（4 位编号）
-
----
-
-## 子目录索引
-
-- [`dev/`](dev/) — 当前实现快照
-  - [`ARCHITECTURE.md`](dev/ARCHITECTURE.md) | [`CORE.md`](dev/CORE.md) | [`PLATFORM.md`](dev/PLATFORM.md) | [`DRIVERS.md`](dev/DRIVERS.md) | [`MISC.md`](dev/MISC.md)
-- [`product/`](product/) — 产品文档
-  - [`ROADMAP.md`](product/ROADMAP.md) | [`REQUIREMENTS.md`](product/REQUIREMENTS.md) | [`adr/INDEX.md`](product/adr/INDEX.md)
-- [`standard/`](standard/) — 规范文档
-  - [`NAMING.md`](standard/NAMING.md) | [`CODE_STYLE.md`](standard/CODE_STYLE.md) | [`ARCHITECTURE_RULES.md`](standard/ARCHITECTURE_RULES.md) | [`DEBUGGING.md`](standard/DEBUGGING.md) | [`ASSETS.md`](standard/ASSETS.md) | [`DEPENDENCIES.md`](standard/DEPENDENCIES.md) | [`TESTING.md`](standard/TESTING.md)
-- [`debug/`](debug/) — 已结案缺陷与调查笔记（非规范）
-  - [`README.md`](debug/README.md)
-- [`superpowers/`](superpowers/) — 设计 spec 归档（每次重要重构产生一份）
-
----
-
-*Rover Engine v0.1.0 — Phase 1 完成（基础架构 + 三角形渲染）。*
+文档目录使用小写名称；普通文档使用 `UPPERCASE.md`，ADR 使用 `ADR-NNNN-kebab-case-slug.md`。目录内链接使用相对路径，命令注明工作目录和前置条件。

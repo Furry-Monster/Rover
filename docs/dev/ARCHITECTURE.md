@@ -1,17 +1,17 @@
 # Rover 引擎架构设计文档
 
-> 本文件是 Rover 引擎的架构权威文档，供后续开发参考。所有结构性变更都应该先更新此文档，再修改代码。
+本文说明 Rover 的分层、构建目标和注册流程。结构性变更先更新本文及相关 ADR，再修改代码。
 
 ---
 
 ## 1. 设计哲学
 
-Rover 借鉴 Godot 的 **核心-服务-驱动** 三段式分层、Unity 的 **模块即特性插件** 思想，再叠加自身特色：
+Rover 结合 Godot 的核心—服务—驱动分层和 Unity 的模块化组织，采用以下设计：
 
 1. **依赖倒置 (Dependency Inversion)** —— `core` 定义抽象接口，`drivers` 实现接口，`services` 仅依赖抽象。具体绑定在 `main/` 完成。
-2. **场景即模块** —— 不像 Godot 把 `scene/` 作为固定层，Rover 把场景管理放进 `modules/scene/`，允许 ECS（EnTT）与传统场景树共存或互相替换。
+2. **场景即模块** —— 场景管理位于 `modules/scene/`，支持 ECS（EnTT）与场景树共存或替换。
 3. **双编辑器接口** —— `editor/gui/` 给人类用 ImGui 操作；`editor/cli/` 给 AI Agent 和脚本提供结构化命令。两者共享同一套编辑器基础设施。
-4. **以 CMake 为单一构建源** —— 不引入 SCons / Bee 等额外构建系统，所有目标都通过 CMake 装配。
+4. **单一构建系统** —— 所有目标通过 CMake 装配，统一维护构建依赖。
 
 ---
 
@@ -45,7 +45,7 @@ graph BT
 
 ### 2.1 各层职责速查表
 
-| 层 | 职责 | 不该做什么 |
+| 层 | 职责 | 依赖与职责约束 |
 |---|---|---|
 | **vendor** | 引入第三方库，封装为 CMake target | 不放任何 Rover 业务代码 |
 | **core** | 类型系统、数学、内存、事件、任务、变体、对象模型，**声明** `GraphicsDevice` 等抽象接口 | 不直接调用 Vulkan / SDL，不依赖 services / drivers |
@@ -512,9 +512,7 @@ TEST_CASE("Vector3 dot product") {
 | 为什么 cli 在 editor 下？ | [ADR-0005](../product/adr/ADR-0005-cli-under-editor.md) |
 | 为什么没有 `core/io/`？ | [ADR-0006](../product/adr/ADR-0006-io-split-platform-and-serialization.md) |
 
-补充澄清（不单独成 ADR）：
-
-- **Editor 依赖 services 与 modules** 是 Layer 5 的定义。Editor 必须能驱动整个引擎才能做 Play-In-Editor，所以这种「跨层」依赖是合理的，不违反分层原则。
+Editor 位于 Layer 5，依赖 services 与 modules，以驱动编辑器功能和 Play-In-Editor。
 
 ---
 
@@ -545,7 +543,7 @@ TEST_CASE("Vector3 dot product") {
 - [x] **core/object/**：ClassDB 增强 (`register_property` + `PropertyInfo` getter/setter)
 - [x] **core/graphics/**：BindGroupLayout / BindGroup / PipelineLayout / push constants 抽象
 - [x] **drivers/vulkan/**：descriptor pool、staging buffer 自动上传、`update_texture` 完整实现
-- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源、单生产者依赖 DAG、确定性拓扑排序、auto-cmd-list；跨 pass 自动 barrier 尚待实现）。每个图资源只允许一个写入 pass，读取依赖该生产者；无生产者的导入资源由调用方保证初始内容。循环、多写入、同 pass 反馈和非法引用在编译时拒绝，图修改使执行计划失效，见 [Frame Graph](FRAME_GRAPH.md) 与 [ADR-0013](../product/adr/ADR-0013-frame-graph-compilation.md)。
+- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源、单生产者依赖 DAG、确定性拓扑排序、用途声明与跨 pass 自动 barrier、导出状态）。每个图资源只允许一个写入 pass；无生产者的导入资源由调用方保证初始内容。驱动持续跟踪实际资源状态，串行记录并在呈现前转换交换链，见 [Frame Graph](FRAME_GRAPH.md)、[ADR-0013](../product/adr/ADR-0013-frame-graph-compilation.md) 与 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。
 - [x] **modules/scene/**：EnTT 4 `World` 包装、Entity handle、内置 components（Transform/Mesh/Camera/Light/Name/Hierarchy）+ SceneTree 父子链
 - [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
 - [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）

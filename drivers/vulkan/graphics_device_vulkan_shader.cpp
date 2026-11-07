@@ -66,9 +66,8 @@ namespace rover
             att.storeOp        = to_vk_store_op(a.store_op);
             att.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            att.initialLayout =
-                a.load_op == LoadOp::Load ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-            att.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            att.initialLayout  = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            att.finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             attachments.push_back(att);
 
             VkAttachmentReference ref{};
@@ -87,7 +86,7 @@ namespace rover
             att.storeOp        = to_vk_store_op(desc.depth_stencil.store_op);
             att.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            att.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+            att.initialLayout  = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             att.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             attachments.push_back(att);
 
@@ -104,10 +103,12 @@ namespace rover
         VkSubpassDependency dep{};
         dep.srcSubpass    = VK_SUBPASS_EXTERNAL;
         dep.dstSubpass    = 0;
-        dep.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dep.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dep.srcAccessMask = 0;
-        dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dep.srcStageMask  = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        dep.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dep.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         VkRenderPassCreateInfo info{};
         info.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -188,10 +189,12 @@ namespace rover
         info.layers          = 1;
 
         VkFramebufferResource res{};
-        res.width            = desc.width;
-        res.height           = desc.height;
-        res.attachment_count = static_cast<u32>(views.size());
-        res.render_pass      = desc.render_pass;
+        res.width             = desc.width;
+        res.height            = desc.height;
+        res.attachment_count  = static_cast<u32>(views.size());
+        res.render_pass       = desc.render_pass;
+        res.color_attachments = desc.color_attachments;
+        res.depth_stencil     = desc.depth_stencil;
         if (vkCreateFramebuffer(device_.logical(), &info, nullptr, &res.framebuffer) != VK_SUCCESS)
         {
             ROVER_LOG_ERROR("vkCreateFramebuffer failed");

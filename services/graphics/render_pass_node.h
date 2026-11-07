@@ -28,9 +28,9 @@ namespace rover
         PassBuilder(FrameGraph& graph, u32 pass_index);
 
         // Read the graph writer's output, or external contents if no writer.
-        void read(RenderResourceId id);
+        void read(RenderResourceId id, ResourceAccess access = ResourceAccess::ShaderRead);
         // A resource may be written by only one pass; feedback is unsupported.
-        void write(RenderResourceId id);
+        void write(RenderResourceId id, ResourceAccess access = ResourceAccess::Automatic);
 
         [[nodiscard]] FrameGraph& graph() const { return graph_; }
 
@@ -46,7 +46,8 @@ namespace rover
         GraphicsDevice& device;
         // Command list opened for this pass; the graph is responsible for
         // begin/end render pass when an attachment is set. The callback owns
-        // viewport/scissor setup and synchronization not handled by the driver.
+        // viewport/scissor setup. Declared resource uses are synchronized before
+        // the render pass; callback-internal hazards remain the caller's concern.
         u64 cmd;
     };
 
@@ -65,6 +66,16 @@ namespace rover
         // Populated during setup.
         std::vector<RenderResourceId> reads;
         std::vector<RenderResourceId> writes;
+
+        struct Access
+        {
+            RenderResourceId resource;
+            ResourceAccess   usage;
+            bool             write;
+        };
+
+        // Includes explicit uses only; implicit attachments are added at compile.
+        std::vector<Access> accesses;
 
         // An attachment contributes an implicit write during compilation, separate
         // from explicit writes so replacing it does not leave a stale dependency.

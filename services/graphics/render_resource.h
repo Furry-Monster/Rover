@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/graphics/graphics_desc.h"
+#include "core/graphics/graphics_sync.h"
 #include "core/graphics/graphics_types.h"
 #include "core/typedefs.h"
 
@@ -38,13 +39,15 @@ namespace rover
         ResourceKind     kind     = ResourceKind::Texture;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
 
+        // Undefined leaves the last graph access unchanged; other values request
+        // an export transition after all passes finish recording successfully.
+        ResourceAccess final_access = ResourceAccess::Undefined;
+
         // Imported handles (one of texture / buffer is set depending on `kind`).
         TextureHandle texture = INVALID_HANDLE;
         BufferHandle  buffer  = INVALID_HANDLE;
 
-        // Optional pre-created framebuffer for color/depth attachments. The
-        // simple Phase 2 path uses `GraphicsService::create_framebuffer_for()` to
-        // build this; future graph compile will manage automatically.
+        // Optional caller-created framebuffer containing this color texture.
         FramebufferHandle framebuffer = INVALID_HANDLE;
 
         // Geometry hints; used by transient allocator when implemented.
@@ -55,5 +58,14 @@ namespace rover
 
     using RenderResourceId                         = u32;
     constexpr RenderResourceId INVALID_RESOURCE_ID = 0xFFFFFFFFu;
+
+    struct RenderResourceBarrier
+    {
+        RenderResourceId resource = INVALID_RESOURCE_ID;
+        // Undefined here means the source is resolved from the driver's tracked
+        // state, not that existing physical image contents should be discarded.
+        ResourceAccess before = ResourceAccess::Undefined;
+        ResourceAccess after  = ResourceAccess::Undefined;
+    };
 
 } // namespace rover

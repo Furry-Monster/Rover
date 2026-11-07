@@ -9,6 +9,11 @@ namespace rover
 
     CommandListHandle GraphicsDeviceVulkan::begin_command_list()
     {
+        if (!in_frame_ || active_command_list_ != INVALID_HANDLE)
+        {
+            ROVER_LOG_ERROR("begin_command_list: requires an active frame and serial command recording");
+            return INVALID_HANDLE;
+        }
         VkCommandBufferAllocateInfo alloc_info{};
         alloc_info.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         alloc_info.commandPool        = command_pool_;
@@ -38,6 +43,7 @@ namespace rover
         res.submitted                  = false;
         const CommandListHandle handle = command_lists_.add(res);
         frame_command_lists_.push_back(handle);
+        active_command_list_ = handle;
         return handle;
     }
 
@@ -48,11 +54,17 @@ namespace rover
         {
             return;
         }
+        if (res->in_render_pass)
+        {
+            ROVER_LOG_WARN("end_command_list: ending an open render pass");
+            cmd_end_render_pass(cmd);
+        }
         if (vkEndCommandBuffer(res->buffer) != VK_SUCCESS)
         {
             ROVER_LOG_ERROR("vkEndCommandBuffer failed");
         }
-        res->recording = false;
+        res->recording       = false;
+        active_command_list_ = INVALID_HANDLE;
     }
 
     void GraphicsDeviceVulkan::cmd_begin_render_pass(CommandListHandle cmd,
@@ -62,7 +74,8 @@ namespace rover
     {
         auto* cl     = command_lists_.get(cmd);
         auto* fb_res = framebuffers_.get(fb);
-        if (cl == nullptr || fb_res == nullptr)
+        if (cl == nullptr || !cl->recording || cl->in_render_pass || fb_res == nullptr || cmd != active_command_list_ ||
+            (clear_count != 0 && clear_values == nullptr))
         {
             return;
         }
@@ -70,6 +83,21 @@ namespace rover
         if (rp == nullptr)
         {
             ROVER_LOG_ERROR("cmd_begin_render_pass: framebuffer has invalid render_pass");
+            return;
+        }
+
+        std::vector<TextureBarrier> attachments;
+        for (auto texture : fb_res->color_attachments)
+        {
+            attachments.push_back({texture, ResourceAccess::ColorAttachment});
+        }
+        if (fb_res->depth_stencil != INVALID_HANDLE)
+        {
+            attachments.push_back({fb_res->depth_stencil, ResourceAccess::DepthStencilAttachment});
+        }
+        // Also supports direct device clients such as the legacy triangle demo.
+        if (!cmd_resource_barriers(cmd, {}, attachments))
+        {
             return;
         }
 
@@ -102,16 +130,18 @@ namespace rover
         info.pClearValues      = vk_clears.empty() ? nullptr : vk_clears.data();
 
         vkCmdBeginRenderPass(cl->buffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+        cl->in_render_pass = true;
     }
 
     void GraphicsDeviceVulkan::cmd_end_render_pass(CommandListHandle cmd)
     {
         auto* cl = command_lists_.get(cmd);
-        if (cl == nullptr)
+        if (cl == nullptr || !cl->recording || !cl->in_render_pass)
         {
             return;
         }
         vkCmdEndRenderPass(cl->buffer);
+        cl->in_render_pass = false;
     }
 
     void GraphicsDeviceVulkan::cmd_bind_pipeline(CommandListHandle cmd, PipelineHandle pipeline)
