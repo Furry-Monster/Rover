@@ -17,18 +17,20 @@
 #include "modules/serialization/mesh_asset_cache.h"
 #include "modules/serialization/mesh_data.h"
 #include "modules/serialization/scene_serializer.h"
-#include "modules/serialization/texture_data.h"
-#include "modules/serialization/texture_uploader.h"
 #include "platform/linux/event_pump.h"
 #include "platform/linux/time_source.h"
 #include "platform/linux/window.h"
 #include "services/graphics/frame_graph.h"
 #include "services/graphics/graphics_service.h"
-#include "services/graphics/material.h"
+#include "services/graphics/post_process_pipeline.h"
 #include "shaders/mesh_frag.spv.h"
 #include "shaders/mesh_vert.spv.h"
+#include "shaders/post_process_vert.spv.h"
+#include "shaders/present_frag.spv.h"
+#include "shaders/tone_map_frag.spv.h"
 
-#include <cstring>
+#include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <vector>
 
@@ -39,7 +41,7 @@ namespace rover
     {
 
         // ---------------------------------------------------------------------------
-        // CPU-side push constant matching the layout in mesh.vert.glsl. Keep the
+        // CPU-side push constant matching the layout in mesh.slang. Keep the
         // alignment / order in sync with the shader.
         // ---------------------------------------------------------------------------
         struct MeshPushConstants
@@ -52,268 +54,242 @@ namespace rover
 
         static_assert(sizeof(MeshPushConstants) == 64 + 16 * 3, "MeshPushConstants must be 112 bytes");
 
-        // CPU-side camera UBO matching mesh.vert.glsl set 0 binding 0.
+        // CPU-side camera UBO matching mesh.slang set 0 binding 0.
         struct CameraUbo
         {
             Mat4 view;
             Mat4 projection;
         };
 
-        // Demo-owned GPU resources. Tracked so we can wind them down cleanly on
-        // shutdown (no asset registry lifetime management yet).
         struct DemoResources
         {
-            RenderPassHandle                                     render_pass     = INVALID_HANDLE;
-            ShaderHandle                                         mesh_vs         = INVALID_HANDLE;
-            ShaderHandle                                         mesh_fs         = INVALID_HANDLE;
-            BindGroupLayoutHandle                                bgl             = INVALID_HANDLE;
-            PipelineLayoutHandle                                 pipeline_layout = INVALID_HANDLE;
-            PipelineHandle                                       pipeline        = INVALID_HANDLE;
-            BufferHandle                                         camera_ubo      = INVALID_HANDLE;
-            BindGroupHandle                                      camera_bg       = INVALID_HANDLE;
-            TextureGpuHandles                                    albedo_texture;
-            TextureHandle                                        depth_texture = INVALID_HANDLE;
-            std::unordered_map<TextureHandle, FramebufferHandle> framebuffers;
-            u32                                                  fb_width  = 0;
-            u32                                                  fb_height = 0;
+            explicit DemoResources(GraphicsDevice& graphics) : device(graphics), post(graphics) {}
+
+            DemoResources(const DemoResources&)                   = delete;
+            DemoResources&        operator=(const DemoResources&) = delete;
+            GraphicsDevice&       device;
+            PostProcessPipeline   post;
+            ShaderHandle          mesh_vs         = INVALID_HANDLE;
+            ShaderHandle          mesh_fs         = INVALID_HANDLE;
+            BindGroupLayoutHandle bgl             = INVALID_HANDLE;
+            PipelineLayoutHandle  pipeline_layout = INVALID_HANDLE;
+            PipelineHandle        pipeline        = INVALID_HANDLE;
+
+            struct CameraBinding
+            {
+                BufferHandle    buffer = INVALID_HANDLE;
+                BindGroupHandle group  = INVALID_HANDLE;
+            };
+
+            std::unordered_map<TextureHandle, CameraBinding> cameras;
+            u64                                              camera_generation = 0;
+
+            void clear_cameras(std::unordered_map<TextureHandle, CameraBinding>& bindings)
+            {
+                for (const auto& [texture, camera] : bindings)
+                {
+                    if (camera.group)
+                    {
+                        device.destroy_bind_group(camera.group);
+                    }
+                    if (camera.buffer)
+                    {
+                        device.destroy_buffer(camera.buffer);
+                    }
+                }
+                bindings.clear();
+            }
+
+            ~DemoResources()
+            {
+                device.wait_idle();
+                clear_cameras(cameras);
+                if (pipeline)
+                {
+                    device.destroy_pipeline(pipeline);
+                }
+                if (pipeline_layout)
+                {
+                    device.destroy_pipeline_layout(pipeline_layout);
+                }
+                if (bgl)
+                {
+                    device.destroy_bind_group_layout(bgl);
+                }
+                if (mesh_fs)
+                {
+                    device.destroy_shader(mesh_fs);
+                }
+                if (mesh_vs)
+                {
+                    device.destroy_shader(mesh_vs);
+                }
+                post.shutdown();
+            }
+
+            bool sync_cameras()
+            {
+                if (camera_generation == post.generation())
+                {
+                    return true;
+                }
+                std::unordered_map<TextureHandle, CameraBinding> next;
+                for (u32 i = 0; i < device.get_swapchain_image_count(); ++i)
+                {
+                    auto& camera  = next[device.get_swapchain_texture_at(i)];
+                    camera.buffer = device.create_buffer(
+                        {sizeof(CameraUbo), BufferUsage::Uniform, MemoryUsage::CpuToGpu, "CameraUbo"});
+                    if (!camera.buffer)
+                    {
+                        clear_cameras(next);
+                        return false;
+                    }
+                    BindGroupDesc group{};
+                    group.layout = bgl;
+                    BindGroupEntry entry{};
+                    entry.binding     = 0;
+                    entry.type        = BindingType::UniformBuffer;
+                    entry.buffer      = camera.buffer;
+                    entry.buffer_size = sizeof(CameraUbo);
+                    group.entries     = {entry};
+                    camera.group      = device.create_bind_group(group);
+                    if (!camera.group)
+                    {
+                        clear_cameras(next);
+                        return false;
+                    }
+                }
+                clear_cameras(cameras); // post.prepare() already waited for GPU idle.
+                cameras           = std::move(next);
+                camera_generation = post.generation();
+                return true;
+            }
         };
 
-        bool create_static_resources(GraphicsDevice& device, DemoResources& d)
+        template <usize N>
+        ShaderDesc shader_desc(ShaderStage stage, const std::uint32_t (&code)[N])
         {
-            // ---- Render pass: swapchain color + depth ----
-            RenderPassDesc      rp_desc{};
-            ColorAttachmentDesc color{};
-            color.format       = device.get_swapchain_format();
-            color.load_op      = LoadOp::Clear;
-            color.store_op     = StoreOp::Store;
-            color.blend_enable = false;
-            rp_desc.color_attachments.push_back(color);
-            DepthStencilAttachmentDesc ds{};
-            ds.format                 = Format::D32_SFLOAT;
-            ds.load_op                = LoadOp::Clear;
-            ds.store_op               = StoreOp::DontCare;
-            rp_desc.depth_stencil     = ds;
-            rp_desc.has_depth_stencil = true;
-            rp_desc.debug_name        = "MeshDemoRenderPass";
-            d.render_pass             = device.create_render_pass(rp_desc);
-            if (d.render_pass == INVALID_HANDLE)
+            return {stage, reinterpret_cast<const u8*>(code), sizeof(code), "main"};
+        }
+
+        bool create_static_resources(GraphicsDevice& device, DemoResources& d, const MeshDemoOptions& options)
+        {
+            if (!d.post.initialize(shader_desc(ShaderStage::Vertex, post_process_vert_spv),
+                                   shader_desc(ShaderStage::Fragment, tone_map_frag_spv),
+                                   shader_desc(ShaderStage::Fragment, present_frag_spv),
+                                   options.verify_rendering || !options.capture_path.empty()))
             {
                 return false;
             }
-
-            // ---- Shaders ----
-            ShaderDesc vs{};
-            vs.stage         = ShaderStage::Vertex;
-            vs.bytecode      = reinterpret_cast<const u8*>(mesh_vert_spv);
-            vs.bytecode_size = sizeof(mesh_vert_spv);
-            d.mesh_vs        = device.create_shader(vs);
-
-            ShaderDesc fs{};
-            fs.stage         = ShaderStage::Fragment;
-            fs.bytecode      = reinterpret_cast<const u8*>(mesh_frag_spv);
-            fs.bytecode_size = sizeof(mesh_frag_spv);
-            d.mesh_fs        = device.create_shader(fs);
-            if (d.mesh_vs == INVALID_HANDLE || d.mesh_fs == INVALID_HANDLE)
+            d.mesh_vs = device.create_shader(shader_desc(ShaderStage::Vertex, mesh_vert_spv));
+            d.mesh_fs = device.create_shader(shader_desc(ShaderStage::Fragment, mesh_frag_spv));
+            BindGroupLayoutDesc layout{};
+            layout.entries = {{0, BindingType::UniformBuffer, ShaderStage::Vertex}};
+            d.bgl          = device.create_bind_group_layout(layout);
+            if (!d.mesh_vs || !d.mesh_fs || !d.bgl)
             {
                 return false;
             }
-
-            // ---- Bind group layout (set 0: CameraUbo) ----
-            BindGroupLayoutDesc  bgl_desc{};
-            BindGroupLayoutEntry e{};
-            e.binding          = 0;
-            e.type             = BindingType::UniformBuffer;
-            e.stage_visibility = ShaderStage::Vertex;
-            bgl_desc.entries.push_back(e);
-            bgl_desc.debug_name = "MeshCameraLayout";
-            d.bgl               = device.create_bind_group_layout(bgl_desc);
-            if (d.bgl == INVALID_HANDLE)
+            PipelineLayoutDesc pipeline_layout{};
+            pipeline_layout.bind_group_layouts = {d.bgl};
+            pipeline_layout.push_constants     = {
+                {ShaderStage::Vertex | ShaderStage::Fragment, 0, sizeof(MeshPushConstants)}};
+            d.pipeline_layout = device.create_pipeline_layout(pipeline_layout);
+            if (!d.pipeline_layout)
             {
                 return false;
             }
-
-            // ---- Pipeline layout (1 bind group + push constants) ----
-            PipelineLayoutDesc pl_desc{};
-            pl_desc.bind_group_layouts.push_back(d.bgl);
-            PushConstantRange pc{};
-            pc.stage_visibility = ShaderStage::Vertex | ShaderStage::Fragment;
-            pc.offset           = 0;
-            pc.size             = sizeof(MeshPushConstants);
-            pl_desc.push_constants.push_back(pc);
-            pl_desc.debug_name = "MeshDemoPipelineLayout";
-            d.pipeline_layout  = device.create_pipeline_layout(pl_desc);
-            if (d.pipeline_layout == INVALID_HANDLE)
-            {
-                return false;
-            }
-
-            // ---- Graphics pipeline (vertex layout matches MeshVertex) ----
             GraphicsPipelineDesc gp{};
-            gp.vertex_shader   = d.mesh_vs;
-            gp.fragment_shader = d.mesh_fs;
-            gp.render_pass     = d.render_pass;
-            gp.pipeline_layout = d.pipeline_layout;
-            gp.topology        = PrimitiveTopology::TriangleList;
-            gp.cull_mode       = CullMode::Back;
-            // Matches Mat4::perspective canonical clip (positive viewport height, CCW front).
+            gp.vertex_shader      = d.mesh_vs;
+            gp.fragment_shader    = d.mesh_fs;
+            gp.render_pass        = d.post.scene_render_pass();
+            gp.pipeline_layout    = d.pipeline_layout;
+            gp.cull_mode          = CullMode::Back;
             gp.front_face         = FrontFace::CounterClockwise;
             gp.depth_test_enable  = true;
             gp.depth_write_enable = true;
             gp.depth_compare_op   = CompareOp::Less;
-            gp.blend_enable       = false;
+            VertexBinding vertex{};
+            vertex.binding     = 0;
+            vertex.stride      = sizeof(MeshVertex);
+            vertex.attributes  = {{0, Format::R32G32B32_SFLOAT, 0}, {1, Format::R32G32B32_SFLOAT, 12}};
+            gp.vertex_bindings = {vertex};
+            d.pipeline         = device.create_graphics_pipeline(gp);
+            return d.pipeline != INVALID_HANDLE;
+        }
 
-            VertexBinding vb{};
-            vb.binding = 0;
-            vb.stride  = sizeof(MeshVertex);
-            vb.attributes.push_back({0, Format::R32G32B32_SFLOAT, 0});
-            vb.attributes.push_back({1, Format::R32G32B32_SFLOAT, 12});
-            vb.attributes.push_back({2, Format::R32G32_SFLOAT, 24});
-            gp.vertex_bindings.push_back(vb);
-            gp.debug_name = "MeshDemoPipeline";
-            d.pipeline    = device.create_graphics_pipeline(gp);
-            if (d.pipeline == INVALID_HANDLE)
+        bool verify_pixels(const std::vector<u8>& pixels, const MeshDemoOptions& options)
+        {
+            const f32 background[3] = {0.05f, 0.07f, 0.10f};
+            int       expected[3]{};
+            for (usize c = 0; c < 3; ++c)
             {
+                const f32 exposed = background[c] * options.exposure;
+                const f32 mapped  = options.tone_mapping ? exposed / (1.0f + exposed) : std::min(exposed, 1.0f);
+                expected[c]       = static_cast<int>(std::lround(mapped * 255.0f));
+            }
+            usize background_pixels = 0;
+            usize geometry_pixels   = 0;
+            f64   sum               = 0.0;
+            for (usize i = 0; i < pixels.size(); i += 4)
+            {
+                bool background_match = true;
+                for (usize c = 0; c < 3; ++c)
+                {
+                    background_match &= std::abs(static_cast<int>(pixels[i + c]) - expected[c]) <= 2;
+                    sum += pixels[i + c];
+                }
+                if (pixels[i + 3] != 255)
+                {
+                    ROVER_LOG_ERROR("Scene readback: invalid output alpha");
+                    return false;
+                }
+                if (background_match)
+                {
+                    ++background_pixels;
+                }
+                else
+                {
+                    ++geometry_pixels;
+                }
+            }
+            if (background_pixels == 0 || geometry_pixels == 0)
+            {
+                ROVER_LOG_ERROR("Scene readback requires visible geometry and background: background={}, geometry={}",
+                                background_pixels,
+                                geometry_pixels);
                 return false;
             }
-
-            // ---- Camera UBO + bind group ----
-            BufferDesc ubo{};
-            ubo.size       = sizeof(CameraUbo);
-            ubo.usage      = BufferUsage::Uniform;
-            ubo.memory     = MemoryUsage::CpuToGpu;
-            ubo.debug_name = "CameraUbo";
-            d.camera_ubo   = device.create_buffer(ubo);
-            if (d.camera_ubo == INVALID_HANDLE)
-            {
-                return false;
-            }
-
-            BindGroupDesc bg_desc{};
-            bg_desc.layout = d.bgl;
-            BindGroupEntry be{};
-            be.binding       = 0;
-            be.type          = BindingType::UniformBuffer;
-            be.buffer        = d.camera_ubo;
-            be.buffer_offset = 0;
-            be.buffer_size   = sizeof(CameraUbo);
-            bg_desc.entries.push_back(be);
-            bg_desc.debug_name = "CameraBindGroup";
-            d.camera_bg        = device.create_bind_group(bg_desc);
-            if (d.camera_bg == INVALID_HANDLE)
-            {
-                return false;
-            }
-
-            // ---- Procedural texture (exercises update_texture path even though
-            //      this demo's shader doesn't sample it). Built unconditionally so
-            //      the GPU upload path is verified end-to-end. ----
-            auto checker     = make_checkerboard(64, 64, 8, 220, 220, 220, 80, 80, 80);
-            d.albedo_texture = TextureUploader::upload(device, checker, "demo_checker");
-
+            ROVER_LOG_INFO(
+                "Scene readback verified: background={}, geometry={}, mean_rgb={:.3f}, exposure={}, tone_map={}",
+                background_pixels,
+                geometry_pixels,
+                sum / static_cast<f64>(pixels.size() / 4 * 3),
+                options.exposure,
+                options.tone_mapping);
             return true;
         }
 
-        void rebuild_framebuffers(GraphicsDevice& device, DemoResources& d)
+        bool save_ppm(const std::string& path, u32 width, u32 height, const std::vector<u8>& pixels)
         {
-            for (auto& [tex, fb] : d.framebuffers)
+            auto file = FileAccess::create();
+            if (!file || !file->open(path, FileMode::Write))
             {
-                device.destroy_framebuffer(fb);
+                return false;
             }
-            d.framebuffers.clear();
-
-            if (d.depth_texture != INVALID_HANDLE)
+            const auto      header = "P6\n" + std::to_string(width) + " " + std::to_string(height) + "\n255\n";
+            std::vector<u8> rgb;
+            rgb.reserve(pixels.size() / 4 * 3);
+            for (usize i = 0; i < pixels.size(); i += 4)
             {
-                device.destroy_texture(d.depth_texture);
-                d.depth_texture = INVALID_HANDLE;
+                rgb.insert(rgb.end(), {pixels[i], pixels[i + 1], pixels[i + 2]});
             }
-
-            d.fb_width  = device.get_swapchain_width();
-            d.fb_height = device.get_swapchain_height();
-
-            if (d.fb_width > 0 && d.fb_height > 0)
+            if (!file->write_all_text(header) || file->write(rgb.data(), rgb.size()) != rgb.size())
             {
-                TextureDesc depth_desc{};
-                depth_desc.width      = d.fb_width;
-                depth_desc.height     = d.fb_height;
-                depth_desc.format     = Format::D32_SFLOAT;
-                depth_desc.usage      = TextureUsage::DepthStencilAttachment;
-                depth_desc.debug_name = "MeshDemoDepth";
-                d.depth_texture       = device.create_texture(depth_desc);
-                if (d.depth_texture == INVALID_HANDLE)
-                {
-                    ROVER_LOG_ERROR("Mesh demo: failed to create depth texture");
-                }
+                return false;
             }
-
-            const u32 image_count = device.get_swapchain_image_count();
-            for (u32 i = 0; i < image_count; ++i)
-            {
-                const TextureHandle tex = device.get_swapchain_texture_at(i);
-                if (tex == INVALID_HANDLE)
-                {
-                    continue;
-                }
-                FramebufferDesc fb_desc{};
-                fb_desc.render_pass = d.render_pass;
-                fb_desc.color_attachments.push_back(tex);
-                fb_desc.depth_stencil      = d.depth_texture;
-                fb_desc.width              = d.fb_width;
-                fb_desc.height             = d.fb_height;
-                const FramebufferHandle fb = device.create_framebuffer(fb_desc);
-                if (fb != INVALID_HANDLE)
-                {
-                    d.framebuffers.emplace(tex, fb);
-                }
-            }
-        }
-
-        void destroy_demo(GraphicsDevice& device, DemoResources& d)
-        {
-            for (auto& [tex, fb] : d.framebuffers)
-            {
-                device.destroy_framebuffer(fb);
-            }
-            d.framebuffers.clear();
-
-            if (d.depth_texture != INVALID_HANDLE)
-            {
-                device.destroy_texture(d.depth_texture);
-                d.depth_texture = INVALID_HANDLE;
-            }
-
-            TextureUploader::destroy(device, d.albedo_texture);
-            if (d.camera_bg != INVALID_HANDLE)
-            {
-                device.destroy_bind_group(d.camera_bg);
-            }
-            if (d.camera_ubo != INVALID_HANDLE)
-            {
-                device.destroy_buffer(d.camera_ubo);
-            }
-            if (d.pipeline != INVALID_HANDLE)
-            {
-                device.destroy_pipeline(d.pipeline);
-            }
-            if (d.pipeline_layout != INVALID_HANDLE)
-            {
-                device.destroy_pipeline_layout(d.pipeline_layout);
-            }
-            if (d.bgl != INVALID_HANDLE)
-            {
-                device.destroy_bind_group_layout(d.bgl);
-            }
-            if (d.mesh_fs != INVALID_HANDLE)
-            {
-                device.destroy_shader(d.mesh_fs);
-            }
-            if (d.mesh_vs != INVALID_HANDLE)
-            {
-                device.destroy_shader(d.mesh_vs);
-            }
-            if (d.render_pass != INVALID_HANDLE)
-            {
-                device.destroy_render_pass(d.render_pass);
-            }
+            ROVER_LOG_INFO("Captured post-process output to '{}' ({}x{})", path, width, height);
+            return true;
         }
 
         // Build a default Phase 2 scene: 1 camera + 1 directional light + 1 cube.
@@ -347,27 +323,24 @@ namespace rover
 
     } // namespace
 
-    int run_mesh_demo(GraphicsDevice&    device,
-                      Window&            window,
-                      EventPump&         pump,
-                      TimeSource&        time,
-                      const std::string& scene_path,
-                      u32                frame_limit)
+    int run_mesh_demo(GraphicsDevice&        device,
+                      Window&                window,
+                      EventPump&             pump,
+                      TimeSource&            time,
+                      const std::string&     scene_path,
+                      u32                    frame_limit,
+                      const MeshDemoOptions& options)
     {
-        DemoResources demo{};
-        if (!create_static_resources(device, demo))
+        DemoResources demo{device};
+        if (!create_static_resources(device, demo, options))
         {
-            ROVER_LOG_ERROR("Failed to create mesh demo static resources");
-            destroy_demo(device, demo);
+            ROVER_LOG_ERROR("Failed to create scene render resources");
             return 1;
         }
-        rebuild_framebuffers(device, demo);
-
         auto directory = DirAccess::create();
         if (!directory)
         {
             ROVER_LOG_ERROR("Mesh demo requires a registered filesystem");
-            destroy_demo(device, demo);
             return 1;
         }
         if (!directory->file_exists(scene_path))
@@ -376,178 +349,194 @@ namespace rover
             build_default_scene(initial);
             if (!SceneSerializer::save_json(initial, scene_path))
             {
-                ROVER_LOG_ERROR("Failed to create demo scene '{}'", scene_path);
-                destroy_demo(device, demo);
                 return 1;
             }
-            ROVER_LOG_INFO("Created demo scene '{}'", scene_path);
         }
-
         World          world;
         MeshAssetCache meshes(device);
         if (!SceneSerializer::load_json(scene_path, world) || !meshes.resolve(world))
         {
             ROVER_LOG_ERROR("Failed to load scene '{}'", scene_path);
-            destroy_demo(device, demo);
             return 1;
         }
         ROVER_LOG_INFO("Loaded scene '{}' ({} entities)", scene_path, world.entity_count());
-
-        // ---- Bind device into GraphicsService for the frame loop ----
         auto& service = GraphicsService::get();
         service.bind_device(&device);
 
-        ROVER_LOG_INFO("Mesh demo ready; entering main loop");
+        struct ServiceBinding
+        {
+            GraphicsService& service;
 
-        u32 rendered_frames = 0;
+            ~ServiceBinding()
+            {
+                service.frame_graph().reset();
+                service.unbind_device();
+            }
+        } binding{service};
+
+        u32             rendered_frames = 0;
+        u32             initial_width   = 0;
+        u32             initial_height  = 0;
+        std::vector<u8> last_pixels;
         while (!window.should_close() && (frame_limit == 0 || rendered_frames < frame_limit))
         {
             pump.poll();
             time.tick();
-
             if (!device.begin_frame())
             {
-                device.wait_idle();
-                rebuild_framebuffers(device, demo);
                 continue;
             }
-            if (device.get_swapchain_width() != demo.fb_width || device.get_swapchain_height() != demo.fb_height)
+            if (!demo.post.prepare() || !demo.sync_cameras())
             {
-                device.wait_idle();
-                rebuild_framebuffers(device, demo);
+                device.end_frame();
+                device.present();
+                ROVER_LOG_ERROR("Failed to prepare scene render targets or camera buffers");
+                return 1;
             }
-
-            // ---- Update camera UBO ----
+            const auto  screen = device.get_swapchain_texture();
+            const auto& camera = demo.cameras.at(screen);
+            const u32   width  = demo.post.width();
+            const u32   height = demo.post.height();
+            if (initial_width == 0)
+            {
+                initial_width  = width;
+                initial_height = height;
+            }
+            const f32 aspect = static_cast<f32>(width) / static_cast<f32>(height);
             CameraUbo ubo{};
-            // Find primary camera entity.
-            Mat4 view_mat = Mat4::identity();
-            f32  aspect = static_cast<f32>(demo.fb_width) / static_cast<f32>(demo.fb_height == 0 ? 1 : demo.fb_height);
-            Mat4 proj_mat  = Mat4::perspective(1.0472f, aspect, 0.1f, 100.0f);
-            bool found_cam = false;
-            world.each<CameraComponent, TransformComponent>([&](auto entity, CameraComponent& cc, TransformComponent&) {
-                if (!cc.primary || found_cam)
-                {
-                    return;
-                }
-                found_cam       = true;
-                cc.aspect_ratio = aspect;
-                proj_mat        = cc.projection_matrix();
-                view_mat        = SceneTree::world_matrix(world, entity).inverse();
-            });
-            ubo.view       = view_mat;
-            ubo.projection = proj_mat;
-            device.update_buffer(demo.camera_ubo, &ubo, sizeof(ubo));
-
-            // ---- Find primary directional light ----
+            ubo.view          = Mat4::identity();
+            ubo.projection    = Mat4::perspective(1.0472f, aspect, 0.1f, 100.0f);
+            bool found_camera = false;
+            world.each<CameraComponent, TransformComponent>(
+                [&](auto entity, CameraComponent& component, TransformComponent&) {
+                    if (component.primary && !found_camera)
+                    {
+                        found_camera           = true;
+                        component.aspect_ratio = aspect;
+                        ubo.projection         = component.projection_matrix();
+                        ubo.view               = SceneTree::world_matrix(world, entity).inverse();
+                    }
+                });
+            device.update_buffer(camera.buffer, &ubo, sizeof(ubo));
             Vector3 light_dir{0.0f, -1.0f, 0.0f};
             Vector3 light_color{1.0f, 1.0f, 1.0f};
             f32     light_intensity = 1.0f;
-            world.each<LightComponent>([&](auto, LightComponent& lc) {
-                if (lc.type != LightType::Directional)
+            world.each<LightComponent>([&](auto, LightComponent& light) {
+                if (light.type == LightType::Directional)
                 {
-                    return;
+                    light_dir       = light.direction;
+                    light_color     = light.color;
+                    light_intensity = light.intensity;
                 }
-                light_dir       = lc.direction;
-                light_color     = lc.color;
-                light_intensity = lc.intensity;
             });
-
-            // ---- Frame graph: forward pass writing to the swapchain ----
-            auto& fg = service.frame_graph();
-            fg.reset();
-            const TextureHandle current_tex = device.get_swapchain_texture();
-            const auto          fb_it       = demo.framebuffers.find(current_tex);
-            if (fb_it == demo.framebuffers.end())
-            {
-                ROVER_LOG_WARN("No framebuffer for current swapchain texture");
-                device.end_frame();
-                device.present();
-                continue;
-            }
-
-            auto color_id = fg.import_texture(
-                "color", current_tex, device.get_swapchain_format(), demo.fb_width, demo.fb_height, fb_it->second);
-            auto depth_id =
-                fg.import_texture("depth", demo.depth_texture, Format::D32_SFLOAT, demo.fb_width, demo.fb_height);
-            ClearValue clear{};
-            clear.color[0] = 0.05f;
-            clear.color[1] = 0.07f;
-            clear.color[2] = 0.10f;
-            clear.color[3] = 1.0f;
-            clear.depth    = 1.0f;
-
-            const u32 forward_idx = fg.add_pass(
-                "forward",
-                [&](PassBuilder& b) {
-                    b.write(color_id);
-                    b.write(depth_id, ResourceAccess::DepthStencilAttachment);
+            auto& graph = service.frame_graph();
+            graph.reset();
+            const auto                                         camera_id = graph.import_buffer("camera", camera.buffer);
+            std::unordered_map<BufferHandle, RenderResourceId> mesh_resources;
+            const bool                                         added = demo.post.add_passes(
+                graph,
+                screen,
+                [&](PassBuilder& builder) {
+                    builder.read(camera_id, ResourceAccess::UniformRead);
+                    auto read_mesh_buffer = [&](BufferHandle buffer, ResourceAccess access) {
+                        if (!buffer)
+                        {
+                            return;
+                        }
+                        auto [it, inserted] = mesh_resources.try_emplace(buffer, INVALID_RESOURCE_ID);
+                        if (inserted)
+                        {
+                            it->second = graph.import_buffer("mesh", buffer);
+                        }
+                        builder.read(it->second, access);
+                    };
+                    world.each<MeshComponent>([&](auto, MeshComponent& mesh) {
+                        read_mesh_buffer(mesh.vertex_buffer, ResourceAccess::VertexRead);
+                        read_mesh_buffer(mesh.index_buffer, ResourceAccess::IndexRead);
+                    });
                 },
                 [&](PassExecuteContext& ctx) {
                     ctx.device.cmd_bind_pipeline(ctx.cmd, demo.pipeline);
-                    Viewport vp{};
-                    vp.x      = 0.0f;
-                    vp.y      = 0.0f;
-                    vp.width  = static_cast<f32>(demo.fb_width);
-                    vp.height = static_cast<f32>(demo.fb_height);
-                    ctx.device.cmd_set_viewport(ctx.cmd, vp);
-                    Scissor sc{};
-                    sc.width  = demo.fb_width;
-                    sc.height = demo.fb_height;
-                    ctx.device.cmd_set_scissor(ctx.cmd, sc);
-                    ctx.device.cmd_bind_group(ctx.cmd, 0, demo.camera_bg);
-
+                    ctx.device.cmd_set_viewport(ctx.cmd,
+                                                {0.0f, 0.0f, static_cast<f32>(width), static_cast<f32>(height)});
+                    ctx.device.cmd_set_scissor(ctx.cmd, {0, 0, width, height});
+                    ctx.device.cmd_bind_group(ctx.cmd, 0, camera.group);
                     world.each<TransformComponent, MeshComponent>(
-                        [&](auto entity, TransformComponent&, MeshComponent& mc) {
-                            if (mc.vertex_buffer == INVALID_HANDLE)
+                        [&](auto entity, TransformComponent&, MeshComponent& mesh) {
+                            if (!mesh.vertex_buffer)
                             {
                                 return;
                             }
-                            MeshPushConstants pcdata{};
-                            pcdata.world       = SceneTree::world_matrix(world, entity);
-                            pcdata.light_dir   = Vector4{light_dir.x(), light_dir.y(), light_dir.z(), 0.0f};
-                            pcdata.light_color = Vector4{light_color.x() * light_intensity,
-                                                         light_color.y() * light_intensity,
-                                                         light_color.z() * light_intensity,
-                                                         0.15f};
-                            pcdata.albedo      = Vector4{0.85f, 0.65f, 0.4f, 1.0f};
+                            MeshPushConstants pc{};
+                            pc.world       = SceneTree::world_matrix(world, entity);
+                            pc.light_dir   = {light_dir.x(), light_dir.y(), light_dir.z(), 0.0f};
+                            pc.light_color = {light_color.x() * light_intensity,
+                                              light_color.y() * light_intensity,
+                                              light_color.z() * light_intensity,
+                                              0.15f};
+                            pc.albedo      = {0.85f, 0.65f, 0.4f, 1.0f};
                             ctx.device.cmd_push_constants(ctx.cmd,
                                                           demo.pipeline_layout,
                                                           ShaderStage::Vertex | ShaderStage::Fragment,
-                                                          &pcdata,
-                                                          sizeof(pcdata));
-                            ctx.device.cmd_bind_vertex_buffer(ctx.cmd, mc.vertex_buffer, 0, 0);
-                            if (mc.index_buffer != INVALID_HANDLE)
+                                                          &pc,
+                                                          sizeof(pc));
+                            ctx.device.cmd_bind_vertex_buffer(ctx.cmd, mesh.vertex_buffer, 0, 0);
+                            if (mesh.index_buffer)
                             {
-                                ctx.device.cmd_bind_index_buffer(ctx.cmd, mc.index_buffer, mc.index_type, 0);
-                                ctx.device.cmd_draw_indexed(ctx.cmd, mc.index_count, 1, 0, 0, 0);
+                                ctx.device.cmd_bind_index_buffer(ctx.cmd, mesh.index_buffer, mesh.index_type, 0);
+                                ctx.device.cmd_draw_indexed(ctx.cmd, mesh.index_count, 1, 0, 0, 0);
                             }
                             else
                             {
-                                ctx.device.cmd_draw(ctx.cmd, mc.vertex_count, 1, 0, 0);
+                                ctx.device.cmd_draw(ctx.cmd, mesh.vertex_count, 1, 0, 0);
                             }
                         });
-                });
-            fg.set_color_attachment(forward_idx, color_id, clear, true);
-
-            if (!fg.compile())
-            {
-                ROVER_LOG_WARN("FrameGraph compile failed");
-                device.end_frame();
-                device.present();
-                continue;
-            }
-            fg.execute(device);
-
+                },
+                {options.exposure, options.tone_mapping});
+            const bool recorded = added && graph.compile() && graph.execute(device);
             device.end_frame();
             device.present();
+            if (!recorded)
+            {
+                return 1;
+            }
+            if (demo.post.readback_enabled())
+            {
+                if (!demo.post.read_pixels(screen, last_pixels))
+                {
+                    return 1;
+                }
+                if (options.verify_rendering && !verify_pixels(last_pixels, options))
+                {
+                    return 1;
+                }
+            }
             ++rendered_frames;
+            if (options.resize_test && rendered_frames == 2)
+            {
+                const u32 next_width  = initial_width == 960 ? 1120 : 960;
+                const u32 next_height = initial_height == 540 ? 630 : 540;
+                if (!window.resize(next_width, next_height))
+                {
+                    return 1;
+                }
+            }
         }
-
-        ROVER_LOG_INFO("Rendered {} frames from '{}'; tearing down mesh demo resources", rendered_frames, scene_path);
-        device.wait_idle();
-        destroy_demo(device, demo);
-        meshes.clear();
-        service.unbind_device();
+        if (options.resize_test && (demo.post.generation() < 2 ||
+                                    (demo.post.width() == initial_width && demo.post.height() == initial_height)))
+        {
+            ROVER_LOG_ERROR("Resize verification failed: no updated render target extent");
+            return 1;
+        }
+        if (!options.capture_path.empty() &&
+            (last_pixels.empty() ||
+             !save_ppm(options.capture_path, demo.post.width(), demo.post.height(), last_pixels)))
+        {
+            ROVER_LOG_ERROR("Could not save capture '{}'", options.capture_path);
+            return 1;
+        }
+        ROVER_LOG_INFO(
+            "Rendered {} frames from '{}' through HDR, tone mapping and presentation", rendered_frames, scene_path);
         return 0;
     }
 

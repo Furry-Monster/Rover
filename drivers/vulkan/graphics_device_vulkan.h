@@ -237,6 +237,7 @@ namespace rover
         VkDeviceWrapper    device_;
         VmaAllocator       vma_allocator_ = nullptr;
         VkSwapchainWrapper swapchain_;
+        VkExtent2D         swapchain_requested_extent_{};
 
         VkCommandPool command_pool_ = VK_NULL_HANDLE;
 

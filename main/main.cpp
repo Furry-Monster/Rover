@@ -33,6 +33,7 @@
 #include "shaders/triangle_vert.spv.h"
 
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -241,7 +242,10 @@ namespace rover
     // ---------------------------------------------------------------------------
     // Top-level dispatcher: parses --demo and routes to the chosen demo.
     // ---------------------------------------------------------------------------
-    static int run_main_loop(std::string_view demo_name, const std::string& scene_path, u32 frame_limit)
+    static int run_main_loop(std::string_view       demo_name,
+                             const std::string&     scene_path,
+                             u32                    frame_limit,
+                             const MeshDemoOptions& options)
     {
         auto& platform = LinuxPlatform::get();
         if (!platform.initialized())
@@ -283,7 +287,7 @@ namespace rover
         }
         else
         {
-            rc = run_mesh_demo(*device, window, pump, time, scene_path, frame_limit);
+            rc = run_mesh_demo(*device, window, pump, time, scene_path, frame_limit, options);
         }
         device->shutdown();
         return rc;
@@ -294,6 +298,7 @@ namespace rover
         std::string_view demo_name   = "mesh";
         std::string      scene_path  = "demo.rscene";
         u32              frame_limit = 0;
+        MeshDemoOptions  options;
         for (int i = 1; i < argc; ++i)
         {
             const std::string_view arg = argv[i];
@@ -302,10 +307,25 @@ namespace rover
                 std::puts("Usage: rover [--demo mesh|triangle|frame-graph] [--scene path] [--frames positive-count]\n"
                           "Mesh demo creates the scene only when missing, then loads it for rendering.\n"
                           "Default scene: demo.rscene. --frames applies to all demos.\n"
-                          "frame-graph verifies offscreen GPU readback (default: 8 frames).");
+                          "frame-graph verifies offscreen GPU readback (default: 8 frames).\n"
+                          "Mesh: --exposure positive-value --tone-map reinhard|none\n"
+                          "      --verify-rendering --capture path.ppm --resize-test\n"
+                          "resize-test defaults to 8 frames and requires at least 6.");
                 return 0;
             }
-            if ((arg != "--demo" && arg != "--scene" && arg != "--frames") || i + 1 >= argc)
+            if (arg == "--verify-rendering")
+            {
+                options.verify_rendering = true;
+                continue;
+            }
+            if (arg == "--resize-test")
+            {
+                options.resize_test = true;
+                continue;
+            }
+            if ((arg != "--demo" && arg != "--scene" && arg != "--frames" && arg != "--exposure" &&
+                 arg != "--tone-map" && arg != "--capture") ||
+                i + 1 >= argc)
             {
                 std::fprintf(stderr, "Unknown option or missing value: %s\n", argv[i]);
                 return 1;
@@ -329,6 +349,33 @@ namespace rover
                 }
                 scene_path = value;
             }
+            else if (arg == "--exposure")
+            {
+                const auto result = std::from_chars(value.data(), value.data() + value.size(), options.exposure);
+                if (result.ec != std::errc{} || result.ptr != value.data() + value.size() ||
+                    !std::isfinite(options.exposure) || options.exposure <= 0.0f)
+                {
+                    std::fputs("--exposure requires a finite positive number\n", stderr);
+                    return 1;
+                }
+            }
+            else if (arg == "--tone-map")
+            {
+                if (value != "reinhard" && value != "none")
+                {
+                    std::fputs("--tone-map requires reinhard or none\n", stderr);
+                    return 1;
+                }
+                options.tone_mapping = value == "reinhard";
+            }
+            else if (arg == "--capture")
+            {
+                if (value.empty() || value.starts_with("--"))
+                {
+                    return 1;
+                }
+                options.capture_path = value;
+            }
             else
             {
                 const auto result = std::from_chars(value.data(), value.data() + value.size(), frame_limit);
@@ -338,6 +385,25 @@ namespace rover
                     return 1;
                 }
             }
+        }
+        if (demo_name != "mesh" && (options.verify_rendering || options.resize_test || !options.capture_path.empty() ||
+                                    options.exposure != 1.0f || !options.tone_mapping))
+        {
+            std::fputs("Post-processing options apply to the mesh demo\n", stderr);
+            return 1;
+        }
+        if (options.resize_test && frame_limit == 0)
+        {
+            frame_limit = 8;
+        }
+        if (options.resize_test && frame_limit < 6)
+        {
+            std::fputs("--resize-test requires at least 6 frames\n", stderr);
+            return 1;
+        }
+        if (!options.capture_path.empty() && frame_limit == 0)
+        {
+            frame_limit = 1;
         }
         register_core_types();
 
@@ -351,7 +417,7 @@ namespace rover
         register_editor_types();
 #endif
 
-        const int exit_code = run_main_loop(demo_name, scene_path, frame_limit);
+        const int exit_code = run_main_loop(demo_name, scene_path, frame_limit, options);
 
 #ifdef ROVER_EDITOR_BUILD
         unregister_editor_types();

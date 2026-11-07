@@ -682,18 +682,21 @@ VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation \
 
 ### 15.2 着色器编译
 
-由 `misc/cmake/RoverShader.cmake` 提供，使用 `glslangValidator` 编译 GLSL → SPIR-V → C 头文件：
+由 `misc/cmake/RoverShader.cmake` 调用本地构建的 `slangc`，将 Slang 编译为 SPIR-V 和内联 C++ 头文件：
 
 ```cmake
 include(RoverShader)
 rover_add_shader(_shader_headers
-    SHADER     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/triangle.vert.glsl"
-    STAGE      vert
+    SHADER     "${CMAKE_CURRENT_SOURCE_DIR}/builtin_assets/shaders/triangle.slang"
+    STAGE      vertex
+    ENTRY      vertex_main
     VAR        triangle_vert_spv
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 ```
 
-输出形如 `static const uint32_t triangle_vert_spv[] = { ... };` 的头文件，可直接 `#include` 用作 `ShaderDesc::bytecode`。
+源入口由 `ENTRY` 选择，SPIR-V 入口保持 `main`。矩阵采用列主序，目标为 Vulkan 1.3 / SPIR-V 1.6。编译器来源见 [Slang 记录](../../vendor/SLANG.md)，完整规则见 [资源规范](../standard/ASSETS.md#3-shader-工作流)。
+
+`BindingType::SampledTexture` 对应 `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE`，`Sampler` 对应 `VK_DESCRIPTOR_TYPE_SAMPLER`，与 Slang 的 Texture2D / SamplerState 独立绑定一致。离屏颜色写入到 fragment shader 采样的同步由 Frame Graph 资源用途声明生成，见 [后处理](POST_PROCESS.md)。
 
 ### 15.3 main 中的注册
 

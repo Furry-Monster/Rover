@@ -5,6 +5,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
+#include <climits>
+
 namespace rover
 {
 
@@ -41,8 +43,10 @@ namespace rover
             return false;
         }
 
-        width_        = desc.width;
-        height_       = desc.height;
+        int pixel_width = 0, pixel_height = 0;
+        SDL_GetWindowSizeInPixels(window_, &pixel_width, &pixel_height);
+        width_        = static_cast<u32>(pixel_width);
+        height_       = static_cast<u32>(pixel_height);
         should_close_ = false;
 
         ROVER_LOG_INFO("Window created: '{}' {}x{} (vulkan={}, resizable={})",
@@ -51,6 +55,18 @@ namespace rover
                        desc.height,
                        desc.vulkan,
                        desc.resizable);
+        return true;
+    }
+
+    bool Window::resize(u32 width, u32 height)
+    {
+        if (!window_ || width == 0 || height == 0 || width > static_cast<u32>(INT_MAX) ||
+            height > static_cast<u32>(INT_MAX) ||
+            !SDL_SetWindowSize(window_, static_cast<int>(width), static_cast<int>(height)) || !SDL_SyncWindow(window_))
+        {
+            ROVER_LOG_ERROR("Window resize failed: {}", SDL_GetError());
+            return false;
+        }
         return true;
     }
 

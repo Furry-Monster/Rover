@@ -74,6 +74,7 @@ namespace rover
             ROVER_LOG_ERROR("Failed to create Vulkan swapchain");
             return false;
         }
+        swapchain_requested_extent_ = {window.get_width(), window.get_height()};
         register_swapchain_textures();
 
         VkCommandPoolCreateInfo pool_info{};
@@ -286,19 +287,20 @@ namespace rover
         device_.shutdown();
         instance_.shutdown();
 
-        window_              = nullptr;
-        in_frame_            = false;
-        active_command_list_ = INVALID_HANDLE;
-        swapchain_dirty_     = false;
-        current_frame_       = 0;
-        current_image_       = 0;
+        window_                     = nullptr;
+        in_frame_                   = false;
+        active_command_list_        = INVALID_HANDLE;
+        swapchain_dirty_            = false;
+        current_frame_              = 0;
+        current_image_              = 0;
+        swapchain_requested_extent_ = {};
 
         ROVER_LOG_INFO("GraphicsDeviceVulkan shut down");
     }
 
     void GraphicsDeviceVulkan::recreate_swapchain()
     {
-        if (window_ == nullptr)
+        if (window_ == nullptr || window_->get_width() == 0 || window_->get_height() == 0)
         {
             return;
         }
@@ -317,6 +319,7 @@ namespace rover
             ROVER_LOG_WARN("Failed to recreate swapchain");
             return;
         }
+        swapchain_requested_extent_ = {window_->get_width(), window_->get_height()};
         register_swapchain_textures();
         swapchain_dirty_ = false;
     }

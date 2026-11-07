@@ -1,0 +1,40 @@
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-invocation-control/shader-invocation-control.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-invocation-control/shader-invocation-control.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -emit-spirv-directly
+
+#version 460
+
+groupshared uint raceConditionShared;
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+buffer MyBlockName2
+{
+    uint data[];
+} outputBuffer;
+
+layout(local_size_x = 4) in;
+bool testBarrier()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        raceConditionShared = 3;
+        barrier();
+        raceConditionShared = 1;
+        if (raceConditionShared != 1)
+            return false;
+    }
+    return true
+        && raceConditionShared == 1
+        ;
+}
+
+void computeMain()
+{
+    outputBuffer.data[0] = true
+        && testBarrier()
+        ;
+    // CHECK_GLSL: void main(
+    // CHECK_SPV: OpEntryPoint
+    // BUF: 1
+}

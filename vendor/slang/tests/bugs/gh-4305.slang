@@ -1,0 +1,46 @@
+// The first two invocations compile the `MODIFIER` branch as Slang/HLSL-style source. The next four
+// compile the same physical file as GLSL to compare the equivalent `layout(...)` spelling without
+// duplicating the shader body. An explicit source language therefore intentionally overrides this
+// file's `.slang` extension for those GLSL invocations.
+
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -DQUAD -DMODIFIER
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -DMODIFIER
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl -DQUAD
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl -xslang -DQUAD
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl
+
+//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
+RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT: Texture2D(size=4, content = one):name t2D
+Texture2D<float> t2D;
+//TEST_INPUT: Sampler:name samplerState
+SamplerState samplerState;
+
+// "local_size_x" must appear before "derivative_group_"
+//CHECK:local_size_x
+//CHECK:derivative_group_{{.*}}NV
+
+#ifndef MODIFIER
+#ifdef QUAD
+layout(derivative_group_quadsNV) in;
+#else
+layout(derivative_group_linearNV) in;
+#endif // #ifdef QUAD
+layout(local_size_x = 2, local_size_y = 2, local_size_z = 1) in;
+
+#else
+
+#ifdef QUAD
+[DerivativeGroupQuad]
+#else
+[DerivativeGroupLinear]
+#endif // #ifdef QUAD
+[numthreads(2, 2, 1)]
+#endif // #ifndef MODIFIER
+[shader("compute")]
+void computeMain()
+{
+    //BUF:1
+    outputBuffer[0] = t2D.Sample(samplerState, float2(0.5, 0.5));
+}

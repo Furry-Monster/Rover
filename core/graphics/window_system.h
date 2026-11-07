@@ -32,7 +32,7 @@ namespace rover
         // Strings have static lifetime owned by the platform.
         virtual void get_vulkan_required_extensions(std::vector<const char*>& out) = 0;
 
-        // ---- Window properties ----
+        // ---- Window properties (drawable pixels) ----
 
         [[nodiscard]] virtual u32 get_width() const  = 0;
         [[nodiscard]] virtual u32 get_height() const = 0;

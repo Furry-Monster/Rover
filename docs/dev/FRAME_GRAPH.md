@@ -106,7 +106,7 @@ VK_LAYER_VALIDATE_SYNC=1 bin/debug/rover --demo triangle --frames 8
 VK_LAYER_VALIDATE_SYNC=1 bin/debug/rover --demo mesh --scene main/builtin_assets/scenes/demos/primitives.rscene --frames 8
 ```
 
-`frame-graph` 验证清屏、复制和 CPU 读回同步。它先注册读回消费者，再注册离屏清屏生产者，另有交换链清屏 pass。每帧交替 RGBA8 颜色，离屏纹理复制后导出 ShaderRead，缓冲导出 HostRead，等待 GPU 完成后验证全部 4096 像素。该入口采用逐帧等待；实际 shader 采样和异步读回性能分别需要对应验证。
+`frame-graph` 验证清屏、复制和 CPU 读回同步。它先注册读回消费者，再注册离屏清屏生产者，另有交换链清屏 pass。每帧交替 RGBA8 颜色，离屏纹理复制后导出 ShaderRead，缓冲导出 HostRead，等待 GPU 完成后验证全部 4096 像素。该入口采用逐帧等待。实际场景的 HDR 写入、shader 采样与回读链见 [离屏后处理](POST_PROCESS.md)，其中 pass 以消费者优先的顺序登记，由依赖编译得出执行顺序。异步读回性能另行验证。
 
 2026-11-07 验证记录：Intel Iris Xe / Vulkan 1.3 上，三条路径各 8 帧通过，未出现同步验证错误。
 

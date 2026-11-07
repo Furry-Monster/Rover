@@ -18,7 +18,7 @@ namespace rover
                 case BindingType::StorageBuffer:
                     return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 case BindingType::SampledTexture:
-                    return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 case BindingType::StorageTexture:
                     return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 case BindingType::Sampler:
@@ -182,7 +182,7 @@ namespace rover
                     ii.imageLayout = e.type == BindingType::SampledTexture ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                                            : VK_IMAGE_LAYOUT_GENERAL;
                 }
-                if (e.type == BindingType::SampledTexture || e.type == BindingType::Sampler)
+                if (e.type == BindingType::Sampler)
                 {
                     VkSampler* s = samplers_.get(e.sampler);
                     if (s != nullptr)

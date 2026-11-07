@@ -36,6 +36,7 @@ namespace rover
         Window& operator=(const Window&) = delete;
 
         bool init(const WindowDesc& desc);
+        bool resize(u32 width, u32 height);
         void shutdown();
 
         // ---- WindowSystem ----

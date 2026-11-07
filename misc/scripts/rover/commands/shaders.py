@@ -1,47 +1,49 @@
-"""``rover shaders`` -- recompile GLSL shaders to SPIR-V headers."""
+"""``rover shaders`` -- recompile Slang/HLSL shaders to SPIR-V headers."""
 
 from __future__ import annotations
 
 import argparse
 
-from rover import log, shell
+from rover import log
 from rover.commands import build as cmd_build
 from rover.config import BuildType, ProjectPaths
 
 NAME = "shaders"
-HELP = "Recompile GLSL shaders (touches the source files to invalidate the cache)."
+HELP = "Recompile Slang/HLSL shaders using the vendored compiler."
 DESCRIPTION = (
     "The shader build is wired into CMake via misc/cmake/RoverShader.cmake; "
-    "this command bumps the mtime on every .glsl file under main/shaders/ "
-    "to force ninja to rebuild them, then triggers an incremental build."
+    "this command bumps the mtime on .slang/.hlsl files under main/builtin_assets/shaders/ "
+    "to rebuild them, then triggers an incremental build."
 )
 
 
 def add_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--no-build", action="store_true",
-        help="Touch the GLSL files but skip the subsequent build step.",
+        help="Touch shader sources but skip the subsequent build step.",
     )
 
 
-def _touch_glsl(paths: ProjectPaths) -> int:
-    """Bump mtime on every .glsl source. Returns count touched."""
+def _touch_sources(paths: ProjectPaths) -> int:
+    """Bump mtime on Slang/HLSL sources. Returns count touched."""
     if not paths.shaders_dir.is_dir():
         log.warn(f"Shader directory does not exist: {paths.shaders_dir}")
         return 0
 
     count = 0
-    for glsl in paths.shaders_dir.rglob("*.glsl"):
-        glsl.touch()
-        log.trace(f"touched {glsl.relative_to(paths.root)}")
+    for source in paths.shaders_dir.rglob("*"):
+        if not source.is_file() or source.suffix not in (".slang", ".hlsl"):
+            continue
+        source.touch()
+        log.trace(f"touched {source.relative_to(paths.root)}")
         count += 1
     return count
 
 
 def run(paths: ProjectPaths, build_type: BuildType, args: argparse.Namespace) -> int:
     log.step("Invalidating shader cache")
-    n = _touch_glsl(paths)
-    log.info(f"Touched {n} GLSL file(s)")
+    n = _touch_sources(paths)
+    log.info(f"Touched {n} Slang/HLSL file(s)")
 
     if args.no_build:
         return 0

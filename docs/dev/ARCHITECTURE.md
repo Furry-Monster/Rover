@@ -19,7 +19,7 @@ Rover 结合 Godot 的核心—服务—驱动分层和 Unity 的模块化组织
 
 ```mermaid
 graph BT
-    L0["Layer 0 — vendor/<br/>SDL3, Vulkan(volk+VMA), ImGui,<br/>spdlog, EnTT, doctest"]
+    L0["Layer 0 — vendor/<br/>SDL3, Vulkan(volk+VMA), ImGui,<br/>spdlog, EnTT, doctest, Slang"]
     L1["Layer 1 — core/<br/>类型/数学/分配器/事件/任务/时间/<br/>变体/对象模型 + 抽象接口"]
     L2D["Layer 2 — drivers/<br/>vulkan, d3d12, metal, ...<br/>实现 core 抽象接口"]
     L2P["Layer 2 — platform/<br/>linux, windows, mac, android, ios, web<br/>OS 入口、窗口、文件系统"]
@@ -537,6 +537,8 @@ Editor 位于 Layer 5，依赖 services 与 modules，以驱动编辑器功能�
 - [x] **misc/scripts/**：`rover-cli` 工程化 Python 开发者 CLI（configure / build / clean / run / debug / test / format / shaders / status）
 
 ### Phase 2 (v0.2 — 进行中)
+
+离屏场景后处理见 [使用与验证](POST_PROCESS.md)，按 [ADR-0015](../product/adr/ADR-0015-offscreen-post-process.md) 实施：Slang 源位于 `main/builtin_assets/shaders/`，`services/graphics/PostProcessPipeline` 管理 HDR 场景、RGBA8 色调映射和交换链呈现目标；main 提供 ECS 绘制回调与逐交换链图像的相机 UBO。
 
 - [x] **core/variant/**：`Variant` (union+tag, 64B inline) + `Callable` 类型擦除调用
 - [x] **core/os/**：`FileAccess` / `DirAccess` 抽象 + `platform/linux/` POSIX 实现

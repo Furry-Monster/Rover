@@ -120,3 +120,27 @@ if (UNIX AND NOT APPLE)
 elseif (WIN32)
     target_link_libraries(rover_platform_libs INTERFACE user32 ws2_32)
 endif ()
+
+# ---------------------------------------------------------------------------
+# Slang (host shader compiler)
+# ---------------------------------------------------------------------------
+foreach (_feature
+        CUDA OPTIX NVAPI AFTERMATH XLIB DXIL GFX SLANG_RHI
+        SLANGD SLANGI SLANGRT SLANG_GLSLANG TESTS EXAMPLES RECORD_REPLAY
+        SPLIT_DEBUG_INFO RELEASE_DEBUG_INFO)
+    set(SLANG_ENABLE_${_feature} OFF CACHE BOOL "" FORCE)
+endforeach ()
+set(SLANG_SLANG_LLVM_FLAVOR DISABLE CACHE STRING "" FORCE)
+set(SLANG_EXCLUDE_DAWN ON CACHE BOOL "" FORCE)
+set(SLANG_EXCLUDE_TINT ON CACHE BOOL "" FORCE)
+set(SLANG_LIB_TYPE STATIC CACHE STRING "" FORCE)
+set(SLANG_STANDARD_MODULE_DEVELOP_BUILD OFF CACHE BOOL "" FORCE)
+
+# Keep the compiler's large Debug objects compact.
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_C_FLAGS_DEBUG "-O1 -g0")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O1 -g0")
+endif ()
+
+add_subdirectory("${ROVER_VENDOR_ROOT}/slang" EXCLUDE_FROM_ALL)
+add_executable(Rover::SlangCompiler ALIAS slangc)

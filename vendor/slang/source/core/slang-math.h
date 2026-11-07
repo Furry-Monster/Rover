@@ -1,0 +1,468 @@
+#ifndef SLANG_CORE_MATH_H
+#define SLANG_CORE_MATH_H
+
+#include "slang.h"
+
+#include <cmath>
+
+namespace Slang
+{
+// Some handy constants
+
+// The largest positive (or negative) number
+#define SLANG_HALF_MAX 65504.0f
+// Smallest (denormalized) value. 1 / 2^24
+#define SLANG_HALF_SUB_NORMAL_MIN (1.0f / 16777216.0f)
+
+class Math
+{
+public:
+    // Use to fix type punning issues with strict aliasing
+    union FloatIntUnion
+    {
+        float fvalue;
+        int ivalue;
+
+        SLANG_FORCE_INLINE static FloatIntUnion makeFromInt(int i)
+        {
+            FloatIntUnion cast;
+            cast.ivalue = i;
+            return cast;
+        }
+        SLANG_FORCE_INLINE static FloatIntUnion makeFromFloat(float f)
+        {
+            FloatIntUnion cast;
+            cast.fvalue = f;
+            return cast;
+        }
+    };
+    union DoubleInt64Union
+    {
+        double dvalue;
+        int64_t ivalue;
+        SLANG_FORCE_INLINE static DoubleInt64Union makeFromInt64(int64_t i)
+        {
+            DoubleInt64Union cast;
+            cast.ivalue = i;
+            return cast;
+        }
+        SLANG_FORCE_INLINE static DoubleInt64Union makeFromDouble(double d)
+        {
+            DoubleInt64Union cast;
+            cast.dvalue = d;
+            return cast;
+        }
+    };
+
+    static const float Pi;
+
+    template<typename T>
+    static T Abs(T a)
+    {
+        return (a < 0) ? -a : a;
+    }
+
+    template<typename T>
+    static T Min(const T& v1, const T& v2)
+    {
+        return v1 < v2 ? v1 : v2;
+    }
+    template<typename T>
+    static T Max(const T& v1, const T& v2)
+    {
+        return v1 > v2 ? v1 : v2;
+    }
+    template<typename T>
+    static T Min(const T& v1, const T& v2, const T& v3)
+    {
+        return Min(v1, Min(v2, v3));
+    }
+    template<typename T>
+    static T Max(const T& v1, const T& v2, const T& v3)
+    {
+        return Max(v1, Max(v2, v3));
+    }
+    template<typename T>
+    static T Clamp(const T& val, const T& vmin, const T& vmax)
+    {
+        if (val < vmin)
+            return vmin;
+        else if (val > vmax)
+            return vmax;
+        else
+            return val;
+    }
+
+    static inline int FastFloor(float x)
+    {
+        int i = (int)x;
+        return i - (i > x);
+    }
+
+    static inline int FastFloor(double x)
+    {
+        int i = (int)x;
+        return i - (i > x);
+    }
+
+    static inline int IsNaN(float x) { return std::isnan(x); }
+    static inline int IsNaN(double x) { return std::isnan(x); }
+
+    static inline int IsInf(float x) { return std::isinf(x); }
+    static inline int IsInf(double x) { return std::isinf(x); }
+
+    static inline unsigned int Ones32(unsigned int x)
+    {
+        /* 32-bit recursive reduction using SWAR...
+            but first step is mapping 2-bit values
+            into sum of 2 1-bit values in sneaky way
+        */
+        x -= ((x >> 1) & 0x55555555);
+        x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
+        x = (((x >> 4) + x) & 0x0f0f0f0f);
+        x += (x >> 8);
+        x += (x >> 16);
+        return (x & 0x0000003f);
+    }
+
+    static inline unsigned int Log2Floor(unsigned int x)
+    {
+        x |= (x >> 1);
+        x |= (x >> 2);
+        x |= (x >> 4);
+        x |= (x >> 8);
+        x |= (x >> 16);
+        return (Ones32(x >> 1));
+    }
+
+    static inline unsigned int Log2Ceil(unsigned int x)
+    {
+        int y = (x & (x - 1));
+        y |= -y;
+        y >>= (32 - 1);
+        x |= (x >> 1);
+        x |= (x >> 2);
+        x |= (x >> 4);
+        x |= (x >> 8);
+        x |= (x >> 16);
+        return (Ones32(x >> 1) - y);
+    }
+    /*
+    static inline int Log2(float x)
+    {
+        unsigned int ix = (unsigned int&)x;
+        unsigned int exp = (ix >> 23) & 0xFF;
+        int log2 = (unsigned int)(exp) - 127;
+
+        return log2;
+    }
+    */
+
+    static bool AreNearlyEqual(double a, double b, double epsilon)
+    {
+        // If they are equal then we are done
+        if (a == b)
+        {
+            return true;
+        }
+
+        const double absA = Abs(a);
+        const double absB = Abs(b);
+        const double diff = Abs(a - b);
+
+        // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
+        const double minNormal = 2.2250738585072014e-308;
+        // Either a or b are very close to being zero, so doing relative comparison isn't really
+        // appropriate
+        if (a == 0.0 || b == 0.0 || (absA + absB < minNormal))
+        {
+            return diff < (epsilon * minNormal);
+        }
+        else
+        {
+            // Calculate a relative relative error
+            return diff < epsilon * (absA + absB);
+        }
+    }
+
+    template<typename T>
+    static T getLowestBit(T val)
+    {
+        return val & (-val);
+    }
+};
+inline int FloatAsInt(float val)
+{
+    return Math::FloatIntUnion::makeFromFloat(val).ivalue;
+}
+inline float IntAsFloat(int val)
+{
+    return Math::FloatIntUnion::makeFromInt(val).fvalue;
+}
+
+SLANG_FORCE_INLINE int64_t DoubleAsInt64(double val)
+{
+    return Math::DoubleInt64Union::makeFromDouble(val).ivalue;
+}
+SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
+{
+    return Math::DoubleInt64Union::makeFromInt64(value).dvalue;
+}
+
+// Rounds a Float32 value to the nearest Half, choosing the even encoding on ties. Constant
+// folding must agree with runtime narrowing: for example, 1.00048828125 is halfway between
+// Half 1.0 and its successor, so it rounds to 1.0. Retain every discarded bit until rounding,
+// including when a normal Float32 becomes a Half subnormal.
+inline unsigned short FloatToHalf(float val)
+{
+    const unsigned int bits = unsigned(FloatAsInt(val));
+    const unsigned int sign = (bits >> 16) & 0x8000u;
+    const unsigned int exponent = (bits >> 23) & 0xffu;
+    const unsigned int fraction = bits & 0x007fffffu;
+    if (exponent == 255)
+    {
+        // Preserve the NaN-vs-infinity distinction and sign. As before, narrowing does not
+        // preserve the NaN payload or distinguish quiet NaNs from signaling NaNs.
+        return (unsigned short)(sign | 0x7c00u | (fraction != 0));
+    }
+    // Float32 uses bias 127; Half uses bias 15. Exponents above 127 + 15 overflow.
+    if (exponent > 142)
+        return (unsigned short)(sign | 0x7c00u);
+    // Half subnormals are multiples of 2^-24. Values below 2^-25 round to zero.
+    if (exponent < 102)
+        return (unsigned short)sign;
+
+    const unsigned int significand = fraction | 0x00800000u;
+    // Below 127 - 14, align to the Half subnormal grid at 2^-24: discard
+    // 23 - (exponent - 127) - 24 = 126 - exponent bits. Otherwise discard 23 - 10 bits.
+    const unsigned int shift = exponent < 113 ? 126 - exponent : 13;
+    unsigned int result = exponent < 113 ? 0 : (exponent - 113) << 10;
+    result += significand >> shift;
+    const unsigned int remainder = significand & ((1u << shift) - 1);
+    const unsigned int halfway = 1u << (shift - 1);
+    // result is the truncated Half encoding in both branches, so its low bit selects
+    // even ties. A carry can reach the minimum normal or advance the exponent to infinity.
+    result += remainder > halfway || (remainder == halfway && (result & 1));
+    return (unsigned short)(sign | result);
+}
+
+inline float HalfToFloat(unsigned short input)
+{
+    static const auto magic = Math::FloatIntUnion::makeFromInt((127 + (127 - 15)) << 23);
+    static const auto was_infnan = Math::FloatIntUnion::makeFromInt((127 + 16) << 23);
+    Math::FloatIntUnion o;
+    o.ivalue = (input & 0x7fff) << 13; // exponent/mantissa bits
+    o.fvalue *= magic.fvalue;          // exponent adjust
+    if (o.fvalue >= was_infnan.fvalue) // make sure Inf/NaN survive
+        o.ivalue |= 255 << 23;
+    o.ivalue |= (input & 0x8000) << 16; // sign bit
+    return o.fvalue;
+}
+
+inline unsigned short FloatToBFloat16(float val)
+{
+    unsigned int x = FloatAsInt(val);
+
+    // Check for NaN: If exponent is 0xFF and mantissa != 0
+    if ((x & 0x7F800000) == 0x7F800000 && (x & 0x007FFFFF) != 0)
+    {
+        return static_cast<unsigned short>((x >> 16) | 0x0040); // Quiet NaN
+    }
+
+    // Round to Nearest Even
+    // Add 0x7FFF + ((x >> 16) & 1) to force round-to-even on ties
+    unsigned int lsb = (x >> 16) & 1;
+    unsigned int bias = 0x7FFF + lsb;
+    x += bias;
+
+    return static_cast<unsigned short>(x >> 16);
+}
+
+inline float BFloat16ToFloat(unsigned short val)
+{
+    // Standard upcast: pad with 16 zeros
+    unsigned int x = static_cast<unsigned int>(val) << 16;
+    return IntAsFloat(x);
+}
+
+inline unsigned int FloatToFloatE4M3(float val)
+{
+    unsigned int x = FloatAsInt(val);
+    unsigned int sign = (x >> 24) & 0x80;
+    unsigned int abs_val = x & 0x7FFFFFFF;
+
+    // Range limits for E4M3 (Bias 7)
+    // Max finite: 448.0f
+    if (abs_val > 0x43E00000)
+        return sign | 0x7F; // Saturate to NaN
+    // Half the minimum subnormal (2^-10) ties to the even encoding zero.
+    if (abs_val <= 0x3A800000)
+        return sign;
+
+    if (abs_val < 0x3C800000)
+    {
+        // Round on the subnormal grid of 2^-9. Consider 15 * 2^-10:
+        // it lies halfway between byte 7 and byte 8, so ties-to-even produces
+        // byte 8, the minimum normal. Keeping the carry preserves that transition.
+        unsigned int significand = (abs_val & 0x007FFFFF) | 0x00800000;
+        unsigned int shift = 141 - (abs_val >> 23); // 21 through 24.
+        unsigned int rounded = significand >> shift;
+        unsigned int remainder = significand & ((1u << shift) - 1);
+        unsigned int halfway = 1u << (shift - 1);
+        if (remainder > halfway || (remainder == halfway && (rounded & 1)))
+            rounded++;
+        return sign | rounded;
+    }
+
+    // Extract FP32 components
+    int exp = (abs_val >> 23) - 127;
+    unsigned int mant = abs_val & 0x007FFFFF;
+
+    // Re-bias to 7 and align mantissa
+    unsigned int e8 = static_cast<unsigned int>(exp + 7);
+    unsigned int m8 = mant >> 20;
+
+    // Robust Rounding (RNE)
+    unsigned int remainder = mant & 0x000FFFFF;
+    if (remainder > 0x00080000 || (remainder == 0x00080000 && (m8 & 1)))
+    {
+        m8++;
+        if (m8 > 7)
+        { // Mantissa overflow
+            m8 = 0;
+            e8++;
+        }
+    }
+
+    // Exponent 15 also contains finite values, from 256 through 448.
+    // The input range check above already excludes values beyond 448.
+    return sign | (e8 << 3) | m8;
+}
+
+inline unsigned int FloatToFloatE5M2(float val)
+{
+    unsigned int x = FloatAsInt(val);
+    unsigned int sign = (x >> 24) & 0x80;
+    unsigned int abs_val = x & 0x7FFFFFFF;
+
+    // Handle NaN / Inf
+    if (abs_val >= 0x7F800000)
+    {
+        return sign | 0x7C | (abs_val > 0x7F800000 ? 1 : 0);
+    }
+
+    // Half the minimum subnormal (2^-17) ties to the even encoding zero.
+    if (abs_val <= 0x37000000)
+        return sign;
+
+    if (abs_val < 0x38800000)
+    {
+        // Round on the subnormal grid of 2^-16. Consider 7 * 2^-17:
+        // it lies halfway between byte 3 and byte 4, so ties-to-even produces
+        // byte 4, the minimum normal. Keeping the carry preserves that transition.
+        unsigned int significand = (abs_val & 0x007FFFFF) | 0x00800000;
+        unsigned int shift = 134 - (abs_val >> 23); // 22 through 24.
+        unsigned int rounded = significand >> shift;
+        unsigned int remainder = significand & ((1u << shift) - 1);
+        unsigned int halfway = 1u << (shift - 1);
+        if (remainder > halfway || (remainder == halfway && (rounded & 1)))
+            rounded++;
+        return sign | rounded;
+    }
+
+    int exp = (abs_val >> 23) - 127;
+    unsigned int mant = abs_val & 0x007FFFFF;
+
+    unsigned int e8 = static_cast<unsigned int>(exp + 15);
+    unsigned int m8 = mant >> 21;
+
+    // RNE Rounding
+    unsigned int remainder = mant & 0x001FFFFF;
+    if (remainder > 0x00100000 || (remainder == 0x00100000 && (m8 & 1)))
+    {
+        m8++;
+        if (m8 > 3)
+        {
+            m8 = 0;
+            e8++;
+        }
+    }
+
+    if (e8 >= 31)
+        return sign | 0x7C; // Infinity
+    return sign | (e8 << 2) | m8;
+}
+
+inline float FloatE4M3ToFloat(unsigned int input)
+{
+    unsigned int sign = (input & 0x80) << 24;
+    if (input == 0x7F || input == 0xFF)
+    {
+        // Preserve the sign bit when converting NaN encodings.
+        return IntAsFloat(sign | 0x7FC00000);
+    }
+    unsigned int exp = (input & 0x78) >> 3;
+    unsigned int mant = (input & 0x07);
+
+    if (exp == 0)
+    {
+        if (mant == 0)
+            return IntAsFloat(sign);
+        // The minimum normal is 2^-6; each subnormal step is one eighth of it.
+        float res = IntAsFloat(sign | 0x3C800000) * (mant / 8.0f);
+        return res;
+    }
+
+    unsigned int res_exp = (exp - 7 + 127) << 23;
+    unsigned int res_mant = mant << 20;
+    return IntAsFloat(sign | res_exp | res_mant);
+}
+
+inline float FloatE5M2ToFloat(unsigned int input)
+{
+    unsigned int sign = (input & 0x80) << 24;
+    unsigned int exp = (input & 0x7C) >> 2;
+    unsigned int mant = (input & 0x03);
+
+    if (exp == 0)
+    {
+        if (mant == 0)
+            return IntAsFloat(sign);
+        // The minimum normal is 2^-14; each subnormal step is one quarter of it.
+        return IntAsFloat(sign | 0x38800000) * (mant / 4.0f);
+    }
+    if (exp == 31)
+    {
+        return IntAsFloat(sign | 0x7F800000 | (mant << 21));
+    }
+
+    unsigned int res_exp = (exp - 15 + 127) << 23;
+    unsigned int res_mant = mant << 21;
+    return IntAsFloat(sign | res_exp | res_mant);
+}
+
+class Random
+{
+private:
+    unsigned int seed;
+
+public:
+    Random(int seed) { this->seed = seed; }
+    int Next() // random between 0 and RandMax (currently 0x7fff)
+    {
+        return ((seed = ((seed << 12) + 150889L) % 714025) & 0x7fff);
+    }
+    int Next(int min, int max) // inclusive min, exclusive max
+    {
+        unsigned int a = ((seed = ((seed << 12) + 150889L) % 714025) & 0xFFFF);
+        unsigned int b = ((seed = ((seed << 12) + 150889L) % 714025) & 0xFFFF);
+        unsigned int r = (a << 16) + b;
+        return min + r % (max - min);
+    }
+    float NextFloat() { return ((Next() << 15) + Next()) / ((float)(1 << 30)); }
+    float NextFloat(float valMin, float valMax) { return valMin + (valMax - valMin) * NextFloat(); }
+    static int RandMax() { return 0x7fff; }
+};
+} // namespace Slang
+
+#endif

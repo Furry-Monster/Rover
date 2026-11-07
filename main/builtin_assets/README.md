@@ -7,6 +7,7 @@
 ```text
 main/builtin_assets/
 ├── README.md
+├── shaders/                 Slang 源与编译约定
 └── scenes/
     └── demos/
         ├── README.md
@@ -25,4 +26,4 @@ main/builtin_assets/
 ./bin/debug/rover --scene main/builtin_assets/scenes/demos/primitives.rscene
 ```
 
-五个示例的内容及完整运行命令见 [示例场景说明](scenes/demos/README.md)。现有编译期 shader 的流程见 [资源规范](../../docs/standard/ASSETS.md)。
+五个示例的内容及完整运行命令见 [示例场景说明](scenes/demos/README.md)。内置 shader 见 [shader 说明](shaders/README.md)，编译流程见 [资源规范](../../docs/standard/ASSETS.md)。

@@ -1,0 +1,74 @@
+schema_version = 1
+
+[packages."slang"]
+version = "2026.21"
+repository = "https://github.com/shader-slang/slang"
+commit = "e73d268973dae1a2af701277b27c2fddef98a274"
+archive = "https://codeload.github.com/shader-slang/slang/tar.gz/refs/tags/v2026.21"
+sha256 = "7b9ede47b8d02108c3cec0b5924f4e9ad86c6b0ec9cf55706cbe3b95cb0a84ac"
+path = "vendor/slang"
+license = "Apache-2.0 WITH LLVM-exception"
+
+[packages."slang-unordered_dense"]
+repository = "https://github.com/martinus/unordered_dense"
+commit = "73f3cbb237e84d483afafc743f1f14ec53e12314"
+archive = "https://codeload.github.com/martinus/unordered_dense/tar.gz/73f3cbb237e84d483afafc743f1f14ec53e12314"
+sha256 = "16188ed4804a670f6b00637a53e135190668dddc12b10f5233e20b403b9df9e2"
+path = "vendor/slang/external/unordered_dense"
+parent = "slang"
+
+[packages."slang-miniz"]
+repository = "https://github.com/richgel999/miniz"
+commit = "6ef6c68f4fcbb8287aa8edf9c6670804932f41c6"
+archive = "https://codeload.github.com/richgel999/miniz/tar.gz/6ef6c68f4fcbb8287aa8edf9c6670804932f41c6"
+sha256 = "d9ef3c09f98b0dba3aa60e520284ed54042b0baa86116312be3f36e26393ae27"
+path = "vendor/slang/external/miniz"
+parent = "slang"
+
+[packages."slang-lz4"]
+repository = "https://github.com/lz4/lz4"
+commit = "7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4"
+archive = "https://codeload.github.com/lz4/lz4/tar.gz/7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4"
+sha256 = "199498e55cbc1f48cd60617c4e5e911da69759bb3e60f7ff8563b31bcf00db05"
+path = "vendor/slang/external/lz4"
+parent = "slang"
+
+[packages."slang-cmark"]
+repository = "https://github.com/swiftlang/swift-cmark"
+commit = "924936d0427cb25a61169739a7660230bffa6ea6"
+archive = "https://codeload.github.com/swiftlang/swift-cmark/tar.gz/924936d0427cb25a61169739a7660230bffa6ea6"
+sha256 = "1c51659bd47c34df1c8976f893adc43ba039a98f6eac4fa95d53d1e08ba6072a"
+path = "vendor/slang/external/cmark"
+parent = "slang"
+
+[packages."slang-fast_float"]
+repository = "https://github.com/fastfloat/fast_float"
+commit = "e0b53eaf63c6d00e0725788ef1dbb759aa321d79"
+archive = "https://codeload.github.com/fastfloat/fast_float/tar.gz/e0b53eaf63c6d00e0725788ef1dbb759aa321d79"
+sha256 = "f6259a3543e75ae705ec80835d1568622b444d389922dcc314af7250c26e8643"
+path = "vendor/slang/external/fast_float"
+parent = "slang"
+
+[packages."slang-spirv-headers"]
+repository = "https://github.com/KhronosGroup/SPIRV-Headers"
+commit = "86f980c731e62ae4eaf383d320449d71687936bf"
+archive = "https://codeload.github.com/KhronosGroup/SPIRV-Headers/tar.gz/86f980c731e62ae4eaf383d320449d71687936bf"
+sha256 = "d11ef011d0788ed002d7cc96224d298f43b126cabe887cd4d46199cb19ecf386"
+path = "vendor/slang/external/spirv-headers"
+parent = "slang"
+
+[packages."slang-vulkan"]
+repository = "https://github.com/KhronosGroup/Vulkan-Headers"
+commit = "387259ecf4b0fe0cfac161b1d0b0a74e42796710"
+archive = "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/387259ecf4b0fe0cfac161b1d0b0a74e42796710"
+sha256 = "d90e6eb2ed69efce8cf49793404b09fbdb7066ea2b624f3f3ea3c8dbc5fa52a0"
+path = "vendor/slang/external/vulkan"
+parent = "slang"
+
+[packages."slang-lua"]
+repository = "https://github.com/lua/lua"
+commit = "3fe7be956f23385aa1950dc31e2f25127ccfc0ea"
+archive = "https://codeload.github.com/lua/lua/tar.gz/3fe7be956f23385aa1950dc31e2f25127ccfc0ea"
+sha256 = "4776526f89abeea61cce41a056577859180dbb2d4cb6c1dad00955872a1007bb"
+path = "vendor/slang/external/lua"
+parent = "slang"

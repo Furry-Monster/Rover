@@ -18,11 +18,11 @@
 
 按 [ADR-0008](../product/adr/ADR-0008-vendor-manual-fetch.md)，第三方库以源码副本下载到 `vendor/<libname>/`，随 Rover 仓库提交。禁止的集成方式见 §1.2.1。
 
-引入新库必须完成以下步骤。manifest 和 fetch 脚本为规划工具，当前使用表中的人工下载方式；脚本命令表示工具完成后的用法。
+引入新库必须完成以下步骤。manifest 已记录 Slang 及其依赖，其他已有库待补登记。fetch 脚本尚未实现，当前按人工下载流程获取源码；脚本命令表示后续工具的用法。
 
 1. **写 ADR**：说明引入动机、考察过的替代方案、license 兼容性
 2. **更新本文档**的"已使用依赖"清单
-3. **登记到 vendor manifest**：在 `misc/scripts/vendor/manifest.toml`（待 Phase 2 落地）记录上游 URL、版本号、SHA-256，确保任何人都能复现下载。
+3. **登记到 vendor manifest**：在 `misc/scripts/vendor/manifest.toml` 记录上游 URL、版本号、SHA-256，确保任何人都能复现下载。
 4. **下载源码副本**到 `vendor/<libname>/`：
 
    | 方式 | 何时使用 | 操作 |
@@ -72,6 +72,7 @@
 
 | 库 | 版本 / 来源 | License | 用途 | 集成方式 |
 |----|-----------|---------|------|---------|
+| **Slang** | v2026.21 | Apache-2.0 WITH LLVM-exception | 构建期 Slang/HLSL → SPIR-V | 源码副本 + `add_subdirectory`，静态宿主编译器 |
 | **SDL3** | vendored | Zlib | 窗口 / 输入 / 计时（platform 层） | 源码副本 + `add_subdirectory` |
 | **Vulkan-Headers** | 系统 SDK（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | `find_package(Vulkan)` |
 | **volk** | vendored | MIT | Vulkan 函数指针动态加载 | 源码副本 + `add_subdirectory` |
@@ -83,15 +84,16 @@
 
 ¹ 当前 `vendor/CMakeLists.txt` 通过 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件。迁移任务：把头文件源码纳入 `vendor/Vulkan-Headers/`，并删除该 `find_package` 调用。
 
-**手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（仓库无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
+**手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest、slang）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（根目录无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
 
 详见：[`vendor/CMakeLists.txt`](../../vendor/CMakeLists.txt)。
+
+Slang 的八个必需依赖按上游固定提交放在 `vendor/slang/external/`，保留许可证。版本、提交、归档与 SHA-256 见 [manifest](../../misc/scripts/vendor/manifest.toml)，构建范围与依赖说明见 [Slang 记录](../../vendor/SLANG.md)。Slang 配置内联在 `vendor/CMakeLists.txt`，shader 转译规则位于 `misc/cmake/RoverShader.cmake`。
 
 ### 2.1 计划引入
 
 | 库 | 用途 | Phase | License 待审 |
 |----|------|-------|-------------|
-| **slang** | Slang/HLSL → SPIR-V/DXIL/MSL/WGSL 转译器（[ADR-0007](../product/adr/ADR-0007-shader-source-language.md)） | Phase 2 | Apache 2.0 |
 | **tinygltf / cgltf** | GLTF 模型导入 | Phase 2 | MIT (tinygltf) / MIT (cgltf) |
 | **stb_image** | 图片解码（PNG/JPG） | Phase 2 | MIT/Public Domain |
 | **KTX-Software** | KTX2 纹理 | Phase 2 | Apache 2.0 |

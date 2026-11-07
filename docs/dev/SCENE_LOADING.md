@@ -41,7 +41,7 @@ cmake --build build -j 4
 | `builtin://meshes/quad` | XY 平面上的单位 quad |
 | `builtin://meshes/sphere` | 半径 1 的 UV 球 |
 
-修改 `transform.scale` 调整尺寸。加载器接受上表中的内置路径，外部、未知或空网格路径会报错。demo 使用固定无纹理着色；纹理上传由工具接口提供，纹理和采样器句柄作为运行时数据管理。
+修改 `transform.scale` 调整尺寸。加载器接受上表中的内置路径，外部、未知或空网格路径会报错。demo 使用固定无纹理场景材质，渲染结果经过 HDR 离屏、曝光/Reinhard 映射与交换链呈现；参数、回读和缩放验证见 [离屏后处理](POST_PROCESS.md)。纹理上传由工具接口提供，纹理和采样器句柄作为运行时数据管理。
 
 `MeshAssetCache` 在 serialization 模块内按路径生成 CPU 网格，通过抽象 `GraphicsDevice` 上传；同路径共享缓冲。缓存拥有 GPU 缓冲，组件借用句柄。销毁缓存前等待 GPU 完成，缓存销毁后再关闭设备。调用 `clear()` 后，重新 `resolve()` 再使用组件绘制，旧句柄失效。
 

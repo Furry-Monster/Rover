@@ -22,6 +22,7 @@
 | [ADR-0012](ADR-0012-task-queue-synchronization.md) | 互斥保护任务队列所有权与溢出回退 | Accepted | 2026-11-05 |
 | [ADR-0013](ADR-0013-frame-graph-compilation.md) | Frame Graph 单生产者依赖编译与执行计划 | Accepted | 2026-11-05 |
 | [ADR-0014](ADR-0014-resource-barriers.md) | 资源访问声明与单队列自动 barrier | Accepted | 2026-11-07 |
+| [ADR-0015](ADR-0015-offscreen-post-process.md) | Slang 编译与离屏场景后处理 | Accepted | 2026-11-07 |
 
 ---
 

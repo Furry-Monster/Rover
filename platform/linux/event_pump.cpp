@@ -23,7 +23,7 @@ namespace rover
                     break;
                 }
 
-                case SDL_EVENT_WINDOW_RESIZED:
+                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 {
                     const u32 w = static_cast<u32>(e.window.data1 > 0 ? e.window.data1 : 0);
                     const u32 h = static_cast<u32>(e.window.data2 > 0 ? e.window.data2 : 0);

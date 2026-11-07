@@ -1,0 +1,391 @@
+// Test shader for SampleCmpGrad and SampleCmpBias functions
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage fragment -entry fragmentMain -target hlsl -DUSE_SPARSE
+//TEST:SIMPLE(filecheck=CHECK_DXIL): -target dxil-assembly -entry fragmentMain -stage fragment -profile ps_6_8 -DUSE_SPARSE
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -stage fragment -entry fragmentMain -target spirv -DUSE_SPARSE
+// GLSL has no sparse-residency shadow forms, so USE_SPARSE is left off for the GLSL run.
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage fragment -entry fragmentMain -target glsl
+
+// The shader below uses sampler2DArrayShadow / samplerCubeArrayShadow bias forms, which are the
+// only shapes in the GL_EXT_texture_shadow_lod extension. Positively assert the #extension pragma
+// is emitted (the extension directive is written at the top of the output, so this must be the
+// first CHECK_GLSL line): if a future change dropped the branch-local __requireCapability in the
+// __glsl_shadow_lod_* wrappers, the compiler would emit an extension builtin with no #extension
+// directive — invalid GLSL — and without this line every CHECK_GLSL below would still pass.
+//CHECK_GLSL: GL_EXT_texture_shadow_lod
+
+SamplerComparisonState shadowSampler;
+Texture1D<float> shadowMap1D;
+Texture1DArray<float> shadowMap1DArray;
+Texture2D<float> shadowMap2D;
+Texture2DArray<float> shadowMap2DArray;
+TextureCube<float> shadowMapCube;
+TextureCubeArray<float> shadowMapCubeArray;
+
+Sampler1DShadow sampler1DShadow;
+Sampler1DArrayShadow sampler1DArrayShadow;
+Sampler2DShadow sampler2DShadow;
+Sampler2DArrayShadow sampler2DArrayShadow;
+SamplerCubeShadow samplerCubeShadow;
+SamplerCubeArrayShadow samplerCubeArrayShadow;
+
+struct PSInput
+{
+    float4 position : SV_Position;
+    float2 texCoord : TEXCOORD0;
+    float depth : DEPTH;
+};
+
+struct PSOutput
+{
+    float4 color : SV_Target0;
+};
+
+PSOutput fragmentMain(PSInput input)
+{
+    PSOutput output;
+
+    float ddx1 = 0.001;
+    float ddy1 = 0.001;
+    float2 ddx2 = float2(0.001, 0.0);
+    float2 ddy2 = float2(0.0, 0.001);
+    float3 ddx3 = float3(0.001, 0.0, 0.0);
+    float3 ddy3 = float3(0.0, 0.001, 0.0);
+
+    int offset1 = 1;
+    int2 offset2 = int2(1, 0);
+    int3 offset3 = int3(1, 0, 0);
+
+    float bias = 0.5;
+    float shadow = 0;
+#ifdef USE_SPARSE
+    uint status;
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad(
+    shadow += shadowMap1D.SampleCmpGrad(shadowSampler, input.texCoord.x, input.depth, ddx1, ddy1);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset(
+    shadow += shadowMap1D.SampleCmpGrad(shadowSampler, input.texCoord.x, input.depth, ddx1, ddy1, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += shadowMap1D.SampleCmpGrad(shadowSampler, input.texCoord.x, input.depth, ddx1, ddy1, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad(
+    shadow += sampler1DShadow.SampleCmpGrad(input.texCoord.x, input.depth, ddx1, ddy1);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset(
+    shadow += sampler1DShadow.SampleCmpGrad(input.texCoord.x, input.depth, ddx1, ddy1, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += sampler1DShadow.SampleCmpGrad(input.texCoord.x, input.depth, ddx1, ddy1, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture(
+    shadow += shadowMap1D.SampleCmpBias(shadowSampler, input.texCoord.x, input.depth, bias);
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset(
+    shadow += shadowMap1D.SampleCmpBias(shadowSampler, input.texCoord.x, input.depth, bias, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += shadowMap1D.SampleCmpBias(shadowSampler, input.texCoord.x, input.depth, bias, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture(
+    shadow += sampler1DShadow.SampleCmpBias(input.texCoord.x, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset(
+    shadow += sampler1DShadow.SampleCmpBias(input.texCoord.x, input.depth, bias, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += sampler1DShadow.SampleCmpBias(input.texCoord.x, input.depth, bias, offset1, status);
+#endif
+
+    // ===== Texture1DArray Tests =====
+    float2 texCoord1DArray = float2(input.texCoord.x, 0);
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler1DArrayShadow
+    shadow += shadowMap1DArray.SampleCmpGrad(shadowSampler, texCoord1DArray, input.depth, ddx1, ddy1);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler1DArrayShadow
+    shadow += shadowMap1DArray.SampleCmpGrad(shadowSampler, texCoord1DArray, input.depth, ddx1, ddy1, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += shadowMap1DArray.SampleCmpGrad(shadowSampler, texCoord1DArray, input.depth, ddx1, ddy1, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler1DArrayShadow
+    shadow += sampler1DArrayShadow.SampleCmpGrad(texCoord1DArray, input.depth, ddx1, ddy1);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler1DArrayShadow
+    shadow += sampler1DArrayShadow.SampleCmpGrad(texCoord1DArray, input.depth, ddx1, ddy1, offset1);
+
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += sampler1DArrayShadow.SampleCmpGrad(texCoord1DArray, input.depth, ddx1, ddy1, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}sampler1DArrayShadow
+    shadow += shadowMap1DArray.SampleCmpBias(shadowSampler, texCoord1DArray, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler1DArrayShadow
+    shadow += shadowMap1DArray.SampleCmpBias(shadowSampler, texCoord1DArray, input.depth, bias, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += shadowMap1DArray.SampleCmpBias(shadowSampler, texCoord1DArray, input.depth, bias, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}sampler1DArrayShadow
+    shadow += sampler1DArrayShadow.SampleCmpBias(texCoord1DArray, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler1DArrayShadow
+    shadow += sampler1DArrayShadow.SampleCmpBias(texCoord1DArray, input.depth, bias, offset1);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += sampler1DArrayShadow.SampleCmpBias(texCoord1DArray, input.depth, bias, offset1, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler2DShadow
+    shadow += shadowMap2D.SampleCmpGrad(shadowSampler, input.texCoord, input.depth, ddx2, ddy2);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler2DShadow
+    shadow += shadowMap2D.SampleCmpGrad(shadowSampler, input.texCoord, input.depth, ddx2, ddy2, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += shadowMap2D.SampleCmpGrad(shadowSampler, input.texCoord, input.depth, ddx2, ddy2, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler2DShadow
+    shadow += sampler2DShadow.SampleCmpGrad(input.texCoord, input.depth, ddx2, ddy2);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler2DShadow
+    shadow += sampler2DShadow.SampleCmpGrad(input.texCoord, input.depth, ddx2, ddy2, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += sampler2DShadow.SampleCmpGrad(input.texCoord, input.depth, ddx2, ddy2, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}sampler2DShadow
+    shadow += shadowMap2D.SampleCmpBias(shadowSampler, input.texCoord, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler2DShadow
+    shadow += shadowMap2D.SampleCmpBias(shadowSampler, input.texCoord, input.depth, bias, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += shadowMap2D.SampleCmpBias(shadowSampler, input.texCoord, input.depth, bias, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}sampler2DShadow
+    shadow += sampler2DShadow.SampleCmpBias(input.texCoord, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler2DShadow
+    shadow += sampler2DShadow.SampleCmpBias(input.texCoord, input.depth, bias, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += sampler2DShadow.SampleCmpBias(input.texCoord, input.depth, bias, offset2, status);
+#endif
+
+    float3 texCoord2DArray = float3(input.texCoord, 0);
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler2DArrayShadow
+    shadow += shadowMap2DArray.SampleCmpGrad(shadowSampler, texCoord2DArray, input.depth, ddx2, ddy2);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler2DArrayShadow
+    shadow += shadowMap2DArray.SampleCmpGrad(shadowSampler, texCoord2DArray, input.depth, ddx2, ddy2, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += shadowMap2DArray.SampleCmpGrad(shadowSampler, texCoord2DArray, input.depth, ddx2, ddy2, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}sampler2DArrayShadow
+    shadow += sampler2DArrayShadow.SampleCmpGrad(texCoord2DArray, input.depth, ddx2, ddy2);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    //CHECK_GLSL: textureGradOffset({{.*}}sampler2DArrayShadow
+    shadow += sampler2DArrayShadow.SampleCmpGrad(texCoord2DArray, input.depth, ddx2, ddy2, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
+    shadow += sampler2DArrayShadow.SampleCmpGrad(texCoord2DArray, input.depth, ddx2, ddy2, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    // sampler2DArrayShadow bias is a GL_EXT_texture_shadow_lod form: emitted as texture(...,bias).
+    //CHECK_GLSL: texture({{.*}}sampler2DArrayShadow
+    shadow += shadowMap2DArray.SampleCmpBias(shadowSampler, texCoord2DArray, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler2DArrayShadow
+    shadow += shadowMap2DArray.SampleCmpBias(shadowSampler, texCoord2DArray, input.depth, bias, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += shadowMap2DArray.SampleCmpBias(shadowSampler, texCoord2DArray, input.depth, bias, offset2, status);
+#endif
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}sampler2DArrayShadow
+    shadow += sampler2DArrayShadow.SampleCmpBias(texCoord2DArray, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    //CHECK_GLSL: textureOffset({{.*}}sampler2DArrayShadow
+    shadow += sampler2DArrayShadow.SampleCmpBias(texCoord2DArray, input.depth, bias, offset2);
+#ifdef USE_SPARSE
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
+    shadow += sampler2DArrayShadow.SampleCmpBias(texCoord2DArray, input.depth, bias, offset2, status);
+#endif
+
+    // ===== TextureCube Tests =====
+    float3 texCoordCube = float3(input.texCoord, 1.0);
+
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}samplerCubeShadow
+    shadow += shadowMapCube.SampleCmpGrad(shadowSampler, texCoordCube, input.depth, ddx3, ddy3);
+    //CHECK_HLSL: SampleCmpGrad
+    //CHECK_DXIL: dx.op.sampleCmpGrad.f32
+    //CHECK_SPIRV: OpImageSampleDrefExplicitLod {{.*}} Grad
+    //CHECK_GLSL: textureGrad({{.*}}samplerCubeShadow
+    shadow += samplerCubeShadow.SampleCmpGrad(texCoordCube, input.depth, ddx3, ddy3);
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}samplerCubeShadow
+    shadow += shadowMapCube.SampleCmpBias(shadowSampler, texCoordCube, input.depth, bias);
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}samplerCubeShadow
+    shadow += samplerCubeShadow.SampleCmpBias(texCoordCube, input.depth, bias);
+
+    // ===== TextureCubeArray Tests =====
+    float4 texCoordCubeArray = float4(input.texCoord, 1.0, 0);
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    // samplerCubeArrayShadow bias passes the comparison value as a separate argument
+    // (texture(sampler, coord, compare, bias)), not packed into the coordinate vector.
+    //CHECK_GLSL: texture({{.*}}samplerCubeArrayShadow
+    shadow += shadowMapCubeArray.SampleCmpBias(shadowSampler, texCoordCubeArray, input.depth, bias);
+
+    //CHECK_HLSL: SampleCmpBias
+    //CHECK_DXIL: dx.op.sampleCmpBias.f32
+    //CHECK_SPIRV: OpImageSampleDrefImplicitLod {{.*}} Bias
+    //CHECK_GLSL: texture({{.*}}samplerCubeArrayShadow
+    shadow += samplerCubeArrayShadow.SampleCmpBias(texCoordCubeArray, input.depth, bias);
+
+    float finalShadow = shadow / 72.0;
+
+    output.color = float4(finalShadow, finalShadow, finalShadow, 1.0);
+    return output;
+}
+

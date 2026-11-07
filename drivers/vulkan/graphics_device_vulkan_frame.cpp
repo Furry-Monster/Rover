@@ -15,6 +15,15 @@ namespace rover
             return false;
         }
 
+        if (window_ == nullptr || window_->get_width() == 0 || window_->get_height() == 0)
+        {
+            return false;
+        }
+        if (window_->get_width() != swapchain_requested_extent_.width ||
+            window_->get_height() != swapchain_requested_extent_.height)
+        {
+            swapchain_dirty_ = true;
+        }
         if (swapchain_dirty_ || swapchain_.handle() == VK_NULL_HANDLE)
         {
             recreate_swapchain();

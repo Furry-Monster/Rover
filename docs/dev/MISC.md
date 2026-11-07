@@ -54,7 +54,7 @@ misc/
 │   ├── RoverOptions.cmake              ROVER_* 编译选项与平台检测
 │   ├── RoverCompiler.cmake             rover_compile_flags 接口库 + sanitizer
 │   ├── RoverUtils.cmake                rover_add_library / rover_glob_sources / 模块注册生成
-│   ├── RoverShader.cmake               rover_add_shader（GLSL → SPIR-V → C 头）
+│   ├── RoverShader.cmake               rover_add_shader（Slang → SPIR-V → C++ 头）
 │   └── RoverVersion.h.in               生成 rover_version.h 的模板
 │
 └── scripts/
@@ -289,7 +289,7 @@ alias rover-cli="$ROVER_ROOT/misc/scripts/rover-cli"
 
 ### 5.8 `rover shaders`
 
-强制重编 GLSL shader：触发 `main/shaders/*.glsl` 的 mtime（CMake/ninja 据此重新调用 `glslangValidator`），然后增量构建。
+强制重编 Slang/HLSL shader：更新 `main/builtin_assets/shaders/` 下 `.slang` / `.hlsl` 的 mtime，然后增量构建。CMake 调用 vendor target `slangc`。
 
 | 选项 | 含义 |
 |------|------|
@@ -501,18 +501,20 @@ def validation_env() -> dict[str, str]
 | `RoverOptions.cmake` | `option(ROVER_*)` 编译开关 + `ROVER_PLATFORM` 自动检测 |
 | `RoverCompiler.cmake` | `Rover::CompileFlags` interface library（warnings、sanitizers、平台宏） |
 | `RoverUtils.cmake` | `rover_add_library`、`rover_glob_sources`、`rover_collect_modules`、`rover_generate_module_registration` |
-| `RoverShader.cmake` | `rover_add_shader`（GLSL → SPIR-V → C 头文件） |
+| `RoverShader.cmake` | `rover_add_shader`（Slang → SPIR-V → C++ 头文件） |
 | `RoverVersion.h.in` | `configure_file` 模板，生成 `rover_version.h` |
 
 ### `rover_add_shader(<output_var> SHADER ... STAGE ... VAR ... OUTPUT_DIR ...)`
 
-将 GLSL 源文件编译为 `static const uint32_t <VAR>[] = { ... };` 形式的 C 头文件，使用 `glslangValidator -V --vn`。
+将 Slang/HLSL 编译为 Vulkan SPIR-V 1.6，再用 `misc/scripts/spirv_to_header.py` 生成 `static const std::uint32_t <VAR>[]` 头文件。
 
-- 自动通过 `find_program` + `VULKAN_SDK` env 定位 `glslangValidator`
-- 目标 Vulkan 1.3
-- 生成的头文件路径追加到 `<output_var>` 列表，可作为 target SOURCES 加入构建依赖
+- `vendor/CMakeLists.txt` 本地构建宿主 target `slangc`，来源见 [vendor/SLANG.md](../../vendor/SLANG.md)。最低 CMake 版本为 3.22。
+- 源位于 `main/builtin_assets/shaders/`，`ENTRY` 选择源入口，输出 SPIR-V 入口统一为 `main`。
+- 指定列主序矩阵、直接 SPIR-V 输出和 `-O0`，当前编译链使用 Slang 自身的代码生成器。
+- `-depfile` 跟踪 import/include；SPIR-V 和头文件均为构建产物。
+- 头文件路径追加到 `<output_var>`，作为可执行 target SOURCES 建立依赖。
 
-详见 [DRIVERS.md §15.2](DRIVERS.md#152-着色器编译)。
+参数示例与绑定约定见 [资源规范 §3](../standard/ASSETS.md#3-shader-工作流)。
 
 ### 修改 CMake 模块时的注意事项
 
@@ -531,6 +533,7 @@ def validation_env() -> dict[str, str]
 - [x] 核心模块：config / log / shell / vulkan
 - [x] 子命令：configure / build / clean / run / debug / test / format / shaders / status
 - [x] CMake 模块：Options / Compiler / Utils / Shader / Version
+- [x] 本地 Slang 编译器、SPIR-V 嵌入与 shader 工具回归测试
 - [x] 自动 Vulkan SDK 发现（`VULKAN_SDK` env、`glslangValidator` 二进制）
 - [x] TTY/`NO_COLOR` 自适应彩色日志
 

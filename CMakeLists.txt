@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 
 project(RoverEngine
         VERSION 0.1.0

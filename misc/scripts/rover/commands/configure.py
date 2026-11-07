@@ -55,7 +55,7 @@ def run(paths: ProjectPaths, build_type: BuildType, args: argparse.Namespace) ->
         log.step(f"Deleting {cache.relative_to(paths.root)}")
         cache.unlink()
 
-    cmake = shell.require("cmake", hint="install cmake (>= 3.21)")
+    cmake = shell.require("cmake", hint="install cmake (>= 3.22)")
     shell.require("ninja", hint="install ninja-build")
 
     cmake_args: list[str] = [

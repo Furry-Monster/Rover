@@ -88,7 +88,7 @@ class ProjectPaths:
     def scripts_dir(self) -> Path: return self.misc_dir / "scripts"
 
     @property
-    def shaders_dir(self) -> Path: return self.root / "main" / "shaders"
+    def shaders_dir(self) -> Path: return self.root / "main" / "builtin_assets" / "shaders"
 
     # ---- Per-build-type ---------------------------------------------------
     def build_dir_for(self, t: BuildType) -> Path:

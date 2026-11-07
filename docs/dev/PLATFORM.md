@@ -83,6 +83,7 @@ public:
     ~Window() override;
 
     bool init(const WindowDesc& desc);
+    bool resize(u32 width, u32 height);
     void shutdown();
 
     // WindowSystem 实现
@@ -104,6 +105,7 @@ public:
 - **SDL3 窗口创建**：`SDL_CreateWindow(title, w, h, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE)`，参数为标题、尺寸和标志。
 - **Vulkan surface 创建**：`SDL_Vulkan_CreateSurface(window_, instance, allocator, surface)`，SDL3 签名增加了 `allocator` 参数（传 `nullptr`）。
 - **Vulkan 扩展查询**：`SDL_Vulkan_GetInstanceExtensions(&count)` 直接返回 `const char* const*`，无需中间缓冲区（与 SDL2 不同）。
+- **调整尺寸**：`resize(width, height)` 调用 SDL_SetWindowSize / SDL_SyncWindow；事件泵更新实际尺寸，驱动在后续帧重建交换链。`--resize-test` 验证后处理目标重建，见 [POST_PROCESS](POST_PROCESS.md)。
 - **不可复制**：`Window` 持有唯一 `SDL_Window*` 资源，复制构造与赋值已 `delete`。
 - **析构自动 shutdown**：`~Window()` 调用 `shutdown()` 释放窗口。
 
@@ -116,7 +118,7 @@ public:
 ### 3.5 与 EventPump 的契约
 
 - `EventPump` 通过 `native()` 拿到 `SDL_Window*`（仅用于事件路由判断）
-- `EventPump::poll()` 处理 `SDL_EVENT_QUIT` / `SDL_EVENT_WINDOW_RESIZED` 时调用 `mark_should_close()` / `set_size()` 改变 `Window` 状态
+- `EventPump::poll()` 处理 `SDL_EVENT_QUIT` / `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` 时调用 `mark_should_close()` / `set_size()` 改变 `Window` 状态
 - 主循环每帧检查 `window.should_close()` 决定是否退出
 
 ---
@@ -205,7 +207,7 @@ private:
 | SDL 事件 | 引擎事件 | 副作用 |
 |----------|---------|--------|
 | `SDL_EVENT_QUIT` | `WindowCloseEvent` | `window_.mark_should_close()` |
-| `SDL_EVENT_WINDOW_RESIZED` | `WindowResizeEvent` | `window_.set_size(w, h)` |
+| `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` | `WindowResizeEvent` | `window_.set_size(w, h)`（drawable 像素） |
 | `SDL_EVENT_WINDOW_FOCUS_GAINED/LOST` | `WindowFocusEvent` | — |
 | `SDL_EVENT_KEY_DOWN/UP` | `KeyEvent` | — |
 | `SDL_EVENT_MOUSE_BUTTON_DOWN/UP` | `MouseButtonEvent` | — |
