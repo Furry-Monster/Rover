@@ -1,6 +1,6 @@
 # Rover 引擎需求清单
 
-> 维护一个 **可增减** 的需求列表，每条带稳定编号 + 状态标签。新增需求 = 新条目；废弃需求 = 状态改为 `Deprecated`，不删除条目（保留历史）。
+每项需求使用稳定编号和状态标签。新增需求分配新编号；废弃需求保留条目，状态改为 `Deprecated`。
 
 ---
 
@@ -165,7 +165,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 
 | ID | 描述 | 状态 |
 |----|------|------|
-| NF-301 | core/ 全部子系统单元测试（doctest） | Implemented（75 cases / 255 assertions） |
+| NF-301 | core/ 全部子系统单元测试（doctest） | Implemented；覆盖范围见 [测试规范](../standard/TESTING.md#73-当前测试覆盖) |
 | NF-302 | services / drivers 集成测试通过 GraphicsDevice mock | Accepted |
 | NF-303 | CLI 工具具有自身单元测试（misc/scripts/） | Deferred |
 | NF-304 | 关键渲染输出有 golden image 比对测试 | Deferred |
@@ -176,7 +176,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 |----|------|------|
 | NF-401 | 每个子系统/层有权威文档（`docs/dev/<area>.md`） | Implemented |
 | NF-402 | `.cursor/rules/` 强制提示文档同步 | Implemented |
-| NF-403 | 重大设计决策记录为 ADR | Implemented（6 条已迁入） |
+| NF-403 | 重大设计决策记录为 ADR | Implemented；见 [ADR 索引](adr/INDEX.md) |
 | NF-404 | 命名 / 风格 / 架构约束有专门规范文档 | Implemented |
 | NF-405 | 模块新增零样板（CMake 自动收集 + 注册生成） | Implemented |
 
@@ -207,13 +207,9 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 
 ---
 
-## 4. 维护注意
+## 4. 维护流程
 
 - **新增需求**：取下一个未用编号（按类别独立计数），列出描述、状态、目标版本，必要时关联 ADR
 - **变更需求**：保留编号，更新描述并在「备注」加变更说明
 - **废弃需求**：状态改为 `Deprecated`，备注写明替代方案
 - **从需求到任务**：实现该需求时把对应条目加入 `dev/<area>.md` 的「后续工作」TODO 列表
-
----
-
-*Rover Engine v0.1.0 — 需求清单与项目演进同步。*

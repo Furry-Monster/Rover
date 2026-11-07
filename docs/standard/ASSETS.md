@@ -1,22 +1,22 @@
 # 资源处理工作流
 
-> 本规范定义 Rover 引擎对 **资源（Assets）** 的格式约束、目录组织、import / export 工作流。当前 Phase 1 仅有 shader，本文档同时规划 Phase 2+ 的格式选型与实现路径。
+本规范说明资源格式、路径、版本控制和 import/export 工作流。下表区分当前数据路径与目标文件格式，现有能力和后续工作集中列在 §9。
 
 ---
 
 ## 1. 资源类型与格式
 
 
-| 资源类别             | 源格式（人类编辑）                         | 中间格式（构建产物）                   | 运行时格式                          | 当前状态       |
-| ---------------- | --------------------------------- | ---------------------------- | ------------------------------ | ---------- |
-| **Shader**       | Slang `.slang`（首选）/ HLSL `.hlsl`  | SPIR-V `.spv`（Vulkan）/ DXIL / MSL / WGSL（按目标后端） | C 头文件（编译时内联）/ 字节码文件（运行时加载） | 🚧 Phase 1（Slang 迁移中，暂存 GLSL）  |
-| **Texture**      | `.png` / `.jpg` / `.tga` / `.exr` | KTX2（推荐）/ DDS / 自定义 `.rtex`  | KTX2 → 解压到 GPU                 | 🎯 Phase 2 |
-| **Model / Mesh** | `.gltf` / `.glb` / `.fbx`（评估）     | 自定义 `.rmesh`（二进制）            | `.rmesh` → 解析到 GPU             | 🎯 Phase 2 |
-| **Audio**        | `.wav` / `.ogg` / `.mp3`          | 直接使用（短音）或 streaming（长音）      | 解码到 PCM 后混音                    | 🎯 Phase 4 |
-| **Font**         | `.ttf` / `.otf`                   | MSDF atlas（推荐）/ bitmap atlas | 纹理 + glyph 元数据                 | 🎯 Phase 3 |
-| **Scene**        | `.rscene`（自定义文本，json 或 KDL 评估中）   | 同源                           | 同源                             | 🎯 Phase 2 |
-| **Material**     | `.rmat`（自定义文本）                    | 同源                           | 同源                             | 🎯 Phase 2 |
-| **Animation**    | `.gltf` 内嵌 / 独立 `.ranim`          | `.ranim`（二进制）                | `.ranim`                       | 🎯 Phase 3 |
+| 资源类别 | 源格式与目标格式 | 运行时路径 | 实现与规划 |
+|----------|------------------|------------|------------|
+| **Shader** | 目标为 Slang `.slang` / HLSL `.hlsl`；按后端生成 SPIR-V / DXIL / MSL / WGSL | 当前将 GLSL 编译为 SPIR-V C 头文件 | Slang 迁移按 ADR-0007 推进 |
+| **Texture** | 目标源格式为 PNG / JPG / TGA / EXR，中间格式为 KTX2 / DDS / `.rtex` | 当前由内存纹理数据上传 GPU | 上传已实现，外部文件导入待完成 |
+| **Model / Mesh** | 目标源格式为 GLTF / GLB，FBX 待评估；中间格式为 `.rmesh` | 当前生成内置网格并上传 GPU | 内置 cube / quad / sphere 已实现，外部模型导入待完成 |
+| **Audio** | WAV / OGG / MP3 | 直接读取短音、流式读取长音，解码为 PCM 后混音 | Phase 4 规划 |
+| **Font** | TTF / OTF → MSDF atlas 或 bitmap atlas | 纹理与 glyph 元数据 | Phase 3 规划 |
+| **Scene** | `.rscene` JSON 与 RBIN 二进制 | 加载 World 并恢复资源引用 | 已实现，见 [场景加载](../dev/SCENE_LOADING.md) |
+| **Material** | 目标为 `.rmat` 文本资源 | demo 当前使用固定材质 | 材质资源工作流待完成 |
+| **Animation** | GLTF 内嵌或 `.ranim` 二进制 | 解析动画资源 | Phase 3 规划 |
 
 
 ---
@@ -345,4 +345,3 @@ public:
 - [glTF 2.0](https://www.khronos.org/gltf/)
 - [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross)（仅作为回退路径）
 - [Basis Universal](https://github.com/BinomialLLC/basis_universal)
-

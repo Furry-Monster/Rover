@@ -1,17 +1,17 @@
 # 测试规范
 
-> 本规范定义 Rover 引擎使用 [doctest](https://github.com/doctest/doctest) 编写测试的约束与组织方式。
+本规范说明 [doctest](https://github.com/doctest/doctest) 测试的组织、依赖隔离、覆盖要求和运行方式。
 
 ---
 
 ## 1. 框架与基础设施
 
 - **框架**：[doctest](https://github.com/doctest/doctest) — header-only，编译快，C++20 友好
-- **入口**：[`tests/main.cpp`](../../tests/main.cpp) — 仅含 `DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN`
-- **运行**：
+- **入口**：[`tests/main.cpp`](../../tests/main.cpp) — 初始化日志系统，运行 doctest 后关闭日志
+- **运行**：在仓库根目录执行，CTest 使用实际的构建目录，如 `build` 或 `build/debug`
   - `./bin/<config>/rover_tests`
   - `./misc/scripts/rover-cli test`
-  - `ctest --test-dir build/<config>`
+  - `ctest --test-dir build --output-on-failure`
 
 ---
 
@@ -29,11 +29,12 @@ tests/
 │   ├── object_test.cpp            测试 core/object/
 │   └── task_test.cpp              测试 core/task/
 ├── services/
-│   └── graphics_test.cpp          测试 services/graphics/（通过 mock）
+│   ├── frame_graph_test.cpp       依赖编译与执行（mock）
+│   └── frame_graph_sync_test.cpp  barrier 与导出同步（mock）
 ├── modules/
 │   └── scene_test.cpp             测试 modules/scene/
 └── drivers/
-    └── vulkan_format_test.cpp     测试 drivers/vulkan/vk_format
+    └── vulkan_sync_test.cpp       CPU 上的 Vulkan 访问范围测试
 ```
 
 - 一个被测目录对应一个或多个 `*_test.cpp` 文件
@@ -46,11 +47,7 @@ tests/
 
 ### 3.1 单元测试（unit）
 
-测试单个类 / 函数 / 模块的孤立行为。**不**依赖：
-- GPU
-- 文件系统（除非通过 RAII 临时目录）
-- 网络
-- 时钟（用 mock）
+单元测试验证单个类、函数或模块的行为。GPU、网络和时钟接口使用 mock；文件读写使用 RAII 临时目录，保持测试输入与清理过程可控。
 
 例：
 
@@ -82,7 +79,6 @@ TEST_CASE("Vector3 normalization")
 - `editor/cli/` + 真实 import 流程
 
 ```cpp
-// tests/services/graphics_test.cpp
 #include <doctest/doctest.h>
 #include "services/graphics/graphics_service.h"
 #include "tests/mocks/mock_graphics_device.h"
@@ -90,23 +86,29 @@ TEST_CASE("Vector3 normalization")
 TEST_CASE("GraphicsService routes to device")
 {
     rover::MockGraphicsDevice mock;
-    rover::GraphicsService    svc;
-    svc.init(&mock, nullptr);
+    auto& svc = rover::GraphicsService::get();
+    auto& graph = svc.frame_graph();
+    graph.reset();
+    svc.bind_device(&mock);
+    graph.add_pass("empty pass", {}, {});
 
-    auto handle = svc.create_buffer(/*...*/);
-    CHECK(mock.create_buffer_call_count == 1);
+    svc.render_frame();
+    CHECK(mock.events == std::vector<std::string>{"begin_cmd", "end_cmd"});
+
+    graph.reset();
+    svc.unbind_device();
 }
 ```
 
-### 3.3 端到端测试（e2e，计划）
+### 3.3 端到端测试（e2e）
 
-驱动真实 driver / platform 的测试。仅在 CI 的特定环境中跑（需要 GPU 或显示器）。
+端到端测试使用真实 driver 和 platform，在具备对应 GPU、显示服务和验证层的环境运行。当前 GPU 验证入口见 [Frame Graph](../dev/FRAME_GRAPH.md#当前边界与验证)。
 
 | 测试类型 | 当前状态 | 何时跑 |
 |---------|---------|-------|
-| Unit | ✅ 已就绪（75 cases） | 每次本地 build + CI |
-| Integration | 🎯 Phase 2 起 | CI 全部 |
-| E2E | 🎯 Phase 5 起 | 仅特定 CI 节点 |
+| Unit | 已就绪 | 常规构建验证，CI 使用相同入口 |
+| Integration | 已有 Frame Graph、场景加载等测试 | 随 doctest 测试集运行 |
+| E2E | GPU demo 手动验证，自动 CI 接入待完成 | 具备 GPU 与显示服务的本地或 CI 环境 |
 
 ---
 
@@ -243,7 +245,7 @@ public:
 
 ## 7. 测试覆盖要求
 
-### 7.1 强制覆盖
+### 7.1 覆盖要求
 
 PR 引入新代码时**必须**有对应测试，下列情况除外：
 
@@ -262,20 +264,24 @@ PR 引入新代码时**必须**有对应测试，下列情况除外：
 | `platform/` OS 适配 | 🟡 中（按平台） |
 | `editor/` UI | 🟢 低（可视化测试） |
 
-### 7.3 当前测试覆盖（v0.1）
+### 7.3 当前测试覆盖
 
 - ✅ `tests/core/allocator_test.cpp` — 全部分配器
 - ✅ `tests/core/event_test.cpp` — Delegate / Signal / EventBus
 - ✅ `tests/core/math_test.cpp` — Vector / Mat4 / Quat / AABB / Transform
 - ✅ `tests/core/object_test.cpp` — Object / ClassDB / RefCounted
 - ✅ `tests/core/task_test.cpp` — JobSystem / WorkStealingQueue
-- 🎯 待补：services / drivers / modules / platform 覆盖
+- `tests/core/variant_test.cpp`、`os_test.cpp` — Variant、Callable 和文件系统
+- `tests/services/frame_graph*_test.cpp` — 依赖编译、访问声明、同步与失败处理
+- `tests/modules/scene*_test.cpp`、`serialization_test.cpp`、`mesh_texture_test.cpp` — 场景、序列化与资源恢复
+- `tests/drivers/vulkan_sync_test.cpp` — Vulkan 访问范围和布局映射，纯 CPU 测试
+- 真实 GPU 路径通过 demo 验证，自动化 CI 接入列为后续工作
 
 ---
 
 ## 8. 性能 / 基准测试（计划）
 
-不放在 `tests/` 内（doctest 不是 benchmark 框架）。计划：
+基准测试规划为 `tests/bench/` 下的独立可执行程序，与 doctest 功能测试分别运行：
 
 - 在 `tests/bench/` 单独放 benchmark
 - 候选框架：Google Benchmark / nanobench

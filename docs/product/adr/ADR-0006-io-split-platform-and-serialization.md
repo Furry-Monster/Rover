@@ -27,7 +27,7 @@ Godot 把所有 IO 相关代码（文件、流、目录、压缩、各种格式�
    - 可被启用 / 禁用 / 替换的模块
    - 包含格式定义、import 工作流、export 工作流
 
-注意：当前 Phase 1 只用到了 shader（编译期内联为 SPIR-V 头文件），尚未实现这两层中的任何一个。Phase 2 会先实现 platform 层文件 API，再写 serialization 模块。
+决策时处于 Phase 1，资源路径为编译期内联的 shader SPIR-V 头文件。两层 IO 的实施安排在 Phase 2：先实现 platform 文件 API，再实现 serialization 模块。
 
 ## Consequences
 
@@ -41,7 +41,7 @@ Godot 把所有 IO 相关代码（文件、流、目录、压缩、各种格式�
 **Negative / Trade-offs:**
 
 - 比 Godot 风格多一个间接层（FileSystem 抽象 → 平台实现 → 序列化使用）
-- 短期内 Phase 1 没有 IO 需求，这个 ADR 只是定方向，没有立刻产生代码
+- 本决策在 Phase 1 确定接口归属，代码实施安排在 Phase 2
 - 跨平台 VFS（如打包成 .pak 后的虚拟路径）需要在抽象层考虑，初版可能简化为「只支持原生路径」
 
 ## Alternatives Considered

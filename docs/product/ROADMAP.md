@@ -157,15 +157,13 @@
 
 ---
 
-## 4. 不在路线图内（明确不做）
+## 4. 产品范围与后续评估
 
-为防止 scope creep：
-
-- ❌ **可视化脚本编辑器**（如 Godot 的 GDScript / Unreal Blueprint）：无 C# 计划；脚本接口暂为 C++ 与 CLI
-- ❌ **完整渲染管线**（如 Lumen / Nanite 级别）：v1.0 范围只覆盖 forward + 简单后处理
-- ❌ **VR / AR 支持**：评估时机推迟到 v1.1+
-- ❌ **多人在线服务托管**：网络服务限于客户端 + 自定义服务器，不做 SaaS
-- ❌ **专属 IDE 插件**：clangd 已经够用，不写自定义插件
+- **脚本与自动化**：采用 C++ 与 CLI。可视化脚本编辑器（如 GDScript / Blueprint）和 C# 不列入路线图。
+- **渲染**：v1.0 提供 forward 与简单后处理，Lumen / Nanite 级完整管线不纳入该版本。
+- **VR / AR**：v1.1+ 再评估。
+- **网络**：支持客户端与自定义服务器；SaaS 托管不列入路线图。
+- **IDE**：使用 clangd，专属 IDE 插件不列入路线图。
 
 ---
 
@@ -187,7 +185,3 @@
 - **Phase 2**：Variant 策略已记录 ADR-0009，场景网格路径已记录 ADR-0011；完整 Asset Pipeline 总体架构随 Phase 3 推进
 - **Phase 4**：物理引擎选型（Jolt vs Bullet vs PhysX）、音频引擎选型
 - **Phase 6**：第二渲染后端选型（D3D12 vs Metal 优先）
-
----
-
-*Rover Engine v0.1.0 — 路线图与项目同步演进。*

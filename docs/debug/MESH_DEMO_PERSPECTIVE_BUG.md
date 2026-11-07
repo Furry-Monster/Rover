@@ -8,17 +8,17 @@
 
 ## 现象
 
-使用默认相场景渲染立方体时，透视关系异常，呈现 **近处小、远处大**（反向收缩），与正确透视相反。
+默认场景中的立方体呈现近处小、远处大的反向透视。
 
 ---
 
-## 原因（摘要）
+## 投影与视口约定
 
-`Mat4::perspective` 原先在 **Y 分量**上使用 **OpenGL 教科书式** 的 `+1/tan(fov/2)`（clip 空间 Y 与经典 GL NDC「向上」一致)，同时在 `mesh_demo` 里用 **负的 viewport `height`** 把 NDC 翻成 Vulkan 习惯（Y 向下）。
+旧路径在 `Mat4::perspective` 中使用正的 Y 比例 `+1/tan(fov/2)`，并在 `mesh_demo` 中通过负 viewport `height` 翻转 Y。
 
-两套约定在理论上可以配对，但在当前管线里容易与 **透视除法 `w`**、深度与光栅化预期混在一起，表现为明显的透视反转。更稳妥的做法是采用与现代 API（Vulkan / Metal / D3D12）一致的 **单一 canonical clip**：在投影矩阵内直接 **翻转 Y**（`c[1][1] = -1/tan(fov/2)`），并使用 **正的** 全屏视口高度；正面绕序改为 **CCW + Back cull**，与正高度视口下的三角形 winding 一致。
+修复统一采用 Rover 的 canonical clip 约定：投影矩阵翻转 Y（`c[1][1] = -1/tan(fov/2)`），视口使用正高度，管线使用 CCW 正面绕序与 Back cull。
 
-**Z 与 w**：实现里 `c[2][3] = -1`（`clip.w = -z_view`）以及将 `[near,far]` 映射到 **[0,1]** 的 `c[2][2]` / `c[3][2]` 本身已是 Vulkan 深度区间，**未**作为本 bug 主因修改。
+**Z 与 w** 保持原实现：`c[2][3] = -1` 对应 `clip.w = -z_view`；`c[2][2]` / `c[3][2]` 将 `[near,far]` 映射到 `[0,1]`。
 
 ---
 
@@ -30,7 +30,7 @@
 | `main/mesh_demo.cpp` | 视口：`y = 0`，`height = +fb_height`（不再为负） |
 | `main/mesh_demo.cpp` | 管线：`FrontFace::CounterClockwise`（替代为配合负视口用的 CW） |
 
-约定说明见 `core/math/mat4.h` 中 `perspective` / `ortho` 注释：**引擎 canonical clip** 与现代 API 家族对齐；若日后接经典 OpenGL 后端，应在驱动层做 clip 修正，而非在 `core/math` 按 API 分支多套矩阵。
+约定说明见 `core/math/mat4.h` 中 `perspective` / `ortho` 注释。后续接入经典 OpenGL 后端时，在驱动层转换 clip 约定，`core/math` 继续使用统一矩阵定义。
 
 ---
 
