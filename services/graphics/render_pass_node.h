@@ -28,9 +28,13 @@ namespace rover
         PassBuilder(FrameGraph& graph, u32 pass_index);
 
         // Read this version's writer output, or external imported contents.
-        void read(RenderResourceId id, ResourceAccess access = ResourceAccess::ShaderRead);
+        void read(RenderResourceId        id,
+                  ResourceAccess          access = ResourceAccess::ShaderRead,
+                  TextureSubresourceRange range  = {});
         // A version may be written by only one pass; feedback is unsupported.
-        void write(RenderResourceId id, ResourceAccess access = ResourceAccess::Automatic);
+        void write(RenderResourceId        id,
+                   ResourceAccess          access = ResourceAccess::Automatic,
+                   TextureSubresourceRange range  = {});
 
         [[nodiscard]] FrameGraph& graph() const { return graph_; }
 
@@ -69,9 +73,10 @@ namespace rover
 
         struct Access
         {
-            RenderResourceId resource;
-            ResourceAccess   usage;
-            bool             write;
+            RenderResourceId        resource;
+            ResourceAccess          usage;
+            bool                    write;
+            TextureSubresourceRange range{};
         };
 
         // Includes explicit uses only; implicit attachments are added at compile.
@@ -79,11 +84,13 @@ namespace rover
 
         // An attachment contributes an implicit write during compilation, separate
         // from explicit writes so replacing it does not leave a stale dependency.
-        RenderResourceId  color_attachment = INVALID_RESOURCE_ID;
-        FramebufferHandle framebuffer      = INVALID_HANDLE;
-        RenderPassHandle  render_pass      = INVALID_HANDLE;
-        RenderResourceId  depth_attachment = INVALID_RESOURCE_ID;
-        bool              has_clear        = false;
+        RenderResourceId        color_attachment = INVALID_RESOURCE_ID;
+        FramebufferHandle       framebuffer      = INVALID_HANDLE;
+        RenderPassHandle        render_pass      = INVALID_HANDLE;
+        RenderResourceId        depth_attachment = INVALID_RESOURCE_ID;
+        TextureSubresourceRange color_range      = TEXTURE_BASE_SUBRESOURCE;
+        TextureSubresourceRange depth_range      = TEXTURE_BASE_SUBRESOURCE;
+        bool                    has_clear        = false;
         /** When true and framebuffer includes depth, pass two clears (color + depth/stencil). */
         bool       clear_depth_stencil = false;
         ClearValue clear{};

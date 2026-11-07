@@ -41,7 +41,11 @@ namespace rover
 
         void destroy_texture(TextureHandle) override {}
 
-        void update_texture(TextureHandle, const void*, usize) override {}
+        void update_texture(TextureHandle,
+                            const void*,
+                            usize,
+                            TextureSubresourceRange = TEXTURE_BASE_SUBRESOURCE) override
+        {}
 
         SamplerHandle create_sampler(const SamplerDesc&) override { return INVALID_HANDLE; }
 
@@ -92,9 +96,18 @@ namespace rover
             return barriers_succeed;
         }
 
-        bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle) override
+        bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle, TextureCopyRegion = {}) override
         {
             events.emplace_back("copy_texture_to_buffer");
+            return true;
+        }
+
+        bool cmd_clear_texture(CommandListHandle,
+                               TextureHandle,
+                               const ClearValue&,
+                               TextureSubresourceRange = {}) override
+        {
+            events.emplace_back("clear_texture");
             return true;
         }
 

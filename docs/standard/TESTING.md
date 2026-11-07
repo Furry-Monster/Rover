@@ -108,7 +108,7 @@ TEST_CASE("GraphicsService routes to device")
 |---------|---------|-------|
 | Unit | 已就绪 | 常规构建验证，CI 使用相同入口 |
 | Integration | 已有 Frame Graph、场景加载等测试 | 随 doctest 测试集运行 |
-| E2E | GPU demo 手动验证，自动 CI 接入待完成 | 具备 GPU 与显示服务的本地或 CI 环境 |
+| E2E | 13 项 GPU 回归脚本已就绪，自动 CI 接入待完成 | 具备 GPU 与显示服务的本地或 CI 环境 |
 
 ---
 
@@ -272,10 +272,28 @@ PR 引入新代码时**必须**有对应测试，下列情况除外：
 - ✅ `tests/core/object_test.cpp` — Object / ClassDB / RefCounted
 - ✅ `tests/core/task_test.cpp` — JobSystem / WorkStealingQueue
 - `tests/core/variant_test.cpp`、`os_test.cpp` — Variant、Callable 和文件系统
-- `tests/services/frame_graph*_test.cpp` — 依赖编译、访问声明、同步与失败处理
+- `tests/services/frame_graph*_test.cpp` — 依赖编译、版本、mip/layer/aspect、访问声明、同步与失败处理
+- `tests/services/transient_resource_pool_test.cpp`、`post_process_pipeline_test.cpp` — 物理复用、在途提交、缓存、失败回滚与后处理
 - `tests/modules/scene*_test.cpp`、`serialization_test.cpp`、`mesh_texture_test.cpp` — 场景、序列化与资源恢复
 - `tests/drivers/vulkan_sync_test.cpp` — Vulkan 访问范围和布局映射，纯 CPU 测试
-- 真实 GPU 路径通过 demo 验证，自动化 CI 接入列为后续工作
+- `misc/scripts/tests/` — shader 工具、lint CLI 和 GPU 回归报告的证据检查
+- 真实 GPU 路径通过 `misc/scripts/phase2_gpu_regression.py` 验证，验收结果见 [Phase 2](../dev/PHASE2_ACCEPTANCE.md)，自动化 CI 接入列为后续工作
+
+### 7.4 ASan / UBSan
+
+使用独立 Debug 构建树与输出根目录，可同时启用 AddressSanitizer 和 UndefinedBehaviorSanitizer。下面的命令构建引擎、测试及其依赖；`rover_tests` 目标包含 CPU 驱动状态测试，运行时不创建 GPU 窗口。
+
+```bash
+cmake -S . -B build/sanitizers -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+  -DROVER_ENABLE_ASAN=ON -DROVER_ENABLE_UBSAN=ON \
+  -DROVER_OUTPUT_ROOT="$PWD/build/sanitizers/bin" -DROVER_EDITOR=OFF
+cmake --build build/sanitizers --target rover_tests -j4
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+  ctest --test-dir build/sanitizers --output-on-failure
+```
+
+需要对应编译器的 sanitizer 运行库。编译选项应用于 Rover 目标，vendor 库沿用各自选项；真实 GPU 回归通过上述独立脚本验证。
 
 ---
 

@@ -10,7 +10,7 @@ from phase2_gpu_regression import cases, inspect_log
 class GpuRegressionTest(unittest.TestCase):
     def test_planned_cases_include_all_scenes_and_lifetime_checks(self):
         labels = {name for name, _ in cases(Path("/tmp/captures"))}
-        self.assertTrue({"primitives", "hierarchy", "depth", "orthographic", "courtyard", "frame-graph", "resize", "inflight"} <= labels)
+        self.assertTrue({"primitives", "hierarchy", "depth", "orthographic", "courtyard", "frame-graph", "resize", "inflight", "subresources"} <= labels)
 
     def test_validation_errors_and_missing_validation_fail(self):
         self.assertTrue(inspect_log("triangle", 0, ""))
@@ -29,6 +29,12 @@ class GpuRegressionTest(unittest.TestCase):
         self.assertFalse(inspect_log("inflight", 0, log))
         self.assertTrue(inspect_log("inflight", 0, log.replace("6 textures", "9 textures")))
         self.assertTrue(inspect_log("inflight", 0, log.replace("Rendered 120 frames", "Rendered 3 frames")))
+
+    def test_subresources_require_gpu_readback_evidence(self):
+        log = "validation=true\n"
+        self.assertTrue(inspect_log("subresources", 0, log))
+        self.assertFalse(inspect_log(
+            "subresources", 0, log + "Subresources GPU verified: 8 frames, 3 mips x 2 layers"))
 
 
 if __name__ == "__main__":

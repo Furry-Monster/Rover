@@ -24,6 +24,7 @@
 #include "drivers/vulkan/register_types.h"
 #include "main/frame_graph_demo.h"
 #include "main/mesh_demo.h"
+#include "main/subresource_demo.h"
 #include "platform/linux/event_pump.h"
 #include "platform/linux/linux_platform.h"
 #include "platform/linux/time_source.h"
@@ -285,6 +286,10 @@ namespace rover
         {
             rc = run_frame_graph_demo(*device, window, pump, frame_limit);
         }
+        else if (demo_name == "subresources")
+        {
+            rc = run_subresource_demo(*device, window, pump, frame_limit);
+        }
         else
         {
             rc = run_mesh_demo(*device, window, pump, time, scene_path, frame_limit, options);
@@ -304,10 +309,12 @@ namespace rover
             const std::string_view arg = argv[i];
             if (arg == "--help")
             {
-                std::puts("Usage: rover [--demo mesh|triangle|frame-graph] [--scene path] [--frames positive-count]\n"
+                std::puts("Usage: rover [--demo mesh|triangle|frame-graph|subresources] [--scene path] [--frames "
+                          "positive-count]\n"
                           "Mesh demo creates the scene only when missing, then loads it for rendering.\n"
                           "Default scene: demo.rscene. --frames applies to all demos.\n"
                           "frame-graph verifies offscreen GPU readback (default: 8 frames).\n"
+                          "subresources verifies mip/layer views and depth/stencil readback.\n"
                           "Mesh: --exposure positive-value --tone-map reinhard|none\n"
                           "      --verify-rendering --capture path.ppm --resize-test\n"
                           "resize-test defaults to 8 frames and requires at least 6.");
@@ -333,7 +340,7 @@ namespace rover
             const std::string_view value = argv[++i];
             if (arg == "--demo")
             {
-                if (value != "mesh" && value != "triangle" && value != "frame-graph")
+                if (value != "mesh" && value != "triangle" && value != "frame-graph" && value != "subresources")
                 {
                     std::fprintf(stderr, "Unknown demo: %s\n", argv[i]);
                     return 1;

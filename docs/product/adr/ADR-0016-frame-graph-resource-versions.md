@@ -4,6 +4,8 @@
 - **Date**: 2026-11-07
 - **Deciders**: core team
 
+后续扩展：[ADR-0017](ADR-0017-frame-graph-transient-resources.md) 引入图内资源池；[ADR-0018](ADR-0018-texture-subresources.md) 将生产者、依赖与导出约束细化到子资源单元，未写入单元继承前版本。以下记录最初的整资源版本决策。
+
 ## Context
 
 Frame Graph 当前允许每个导入资源有一个生产者。后处理链已验证实际采样；继续复用颜色目标或缓冲需要表达多次写入，以及覆盖前仍需完成的读取。

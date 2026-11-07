@@ -330,6 +330,8 @@ struct VkTextureResource {
     u32            mip_levels;
     u32            array_layers;
     bool           owns_image;     // 交换链图像为 false，避免 destroy_*_swapchain 双重释放
+    std::vector<VkTextureState> states; // 每个 aspect/mip/layer 的访问状态
+    std::vector<VkTextureView>  views;  // 子资源视图缓存
 };
 
 struct VkShaderResource       { VkShaderModule module; VkShaderStageFlagBits stage; };
@@ -438,7 +440,7 @@ private:
 
 - `create_texture`：VMA 分配 image + 创建 ImageView。同时追加 `VK_IMAGE_USAGE_TRANSFER_DST_BIT` 用于上传
 - `destroy_texture`：仅销毁 `owns_image == true` 的资源；交换链图像静默忽略（防双重释放）
-- `update_texture`：通过 staging + `vkCmdCopyBufferToImage` 上传单 mip、单层颜色图像，读取已跟踪的源状态；Sampled 纹理最终转为 ShaderRead，否则保留 TransferWrite。上传会 flush staging 内存，并拒绝在本帧命令录制后插队
+- `update_texture`：通过 staging + `vkCmdCopyBufferToImage` 上传单 mip、单 aspect、连续 layer 的完整平面，读取所选单元已跟踪的源状态；Sampled 纹理最终转为 ShaderRead，否则保留 TransferWrite。上传会 flush staging 内存，并拒绝在本帧命令录制后插队。格式与范围见 [纹理子资源](TEXTURE_SUBRESOURCES.md)
 
 ### 10.3 Sampler
 
@@ -462,7 +464,7 @@ private:
 ### 10.6 Framebuffer
 
 - 查找 `render_passes_` 池获取关联的 RenderPass
-- 查找 `textures_` 池获取每个附件的 ImageView
+- 查找 `textures_` 池，获取或创建单 mip/layer 附件视图，验证所选 mip 尺寸
 - 校验所有句柄有效性
 - 创建 `VkFramebuffer`，单层（`layers = 1`）
 
@@ -498,8 +500,9 @@ private:
 
 | 方法 | 对应 vk 命令 |
 |------|-------------|
-| `cmd_resource_barriers` | 整批验证目标用途后，用 `vkCmdPipelineBarrier` 转换缓冲/纹理 |
-| `cmd_copy_texture_to_buffer` | `vkCmdCopyImageToBuffer`，当前只支持紧密排列的二维 RGBA8 |
+| `cmd_resource_barriers` | 整批验证用途、范围与重叠后，用 `vkCmdPipelineBarrier` 转换缓冲/纹理子资源 |
+| `cmd_copy_texture_to_buffer` | `vkCmdCopyImageToBuffer`，单 mip/aspect、连续 layer 的 RGBA8/BGRA8 或 depth/stencil 平面，支持缓冲偏移 |
+| `cmd_clear_texture` | 对处于 TransferWrite 的所选 mip/layer/aspect 记录颜色或 depth/stencil 清屏 |
 | `cmd_begin_render_pass` | `vkCmdBeginRenderPass`（INLINE 内容） |
 | `cmd_end_render_pass` | `vkCmdEndRenderPass` |
 | `cmd_bind_pipeline` | `vkCmdBindPipeline`（GRAPHICS bind point） |
@@ -512,7 +515,7 @@ private:
 
 ### 11.3 ClearValue 处理
 
-状态跟踪见 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。纹理记录当前布局对应的用途；缓冲/纹理保留最近写入与全部后续读阶段/访问掩码，新写入同步消费这些范围。`vk_sync.h` 负责映射，`graphics_device_vulkan_sync.cpp` 负责整批验证、同步和读回。每个命令列表串行打开/结束；barrier 只可在 render pass 外使用。同步上传只能在本帧命令录制前进行，上传后维护状态并 flush 非一致 staging 内存。
+状态跟踪见 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md) 和 [ADR-0018](../product/adr/ADR-0018-texture-subresources.md)。纹理按 aspect/mip/layer 记录当前用途及对应布局；缓冲和每个纹理单元保留最近写入与全部后续读阶段/访问掩码，新写入同步消费这些范围。`vk_sync.h` 负责访问映射，`vk_texture_state.h` 负责子资源与 depth/stencil 布局，`graphics_device_vulkan_sync.cpp` 负责整批验证、同步、清屏和读回。设备按特性启用独立 depth/stencil 布局。每个命令列表串行打开/结束；barrier 只可在 render pass 外使用。同步上传只能在本帧命令录制前进行，上传后维护状态并 flush 非一致 staging 内存。
 
 `cmd_begin_render_pass` 接收 `const ClearValue*`、count，转换为 `VkClearValue` 数组：
 - 第 N 个 ClearValue 是颜色还是深度，取决于 render pass 是否最后一个附件是深度
@@ -748,19 +751,19 @@ device->init(window);                           // window 实现 WindowSystem �
 - [x] begin/end_frame + present + 双帧 in-flight
 - [x] Swapchain 重建（窗口缩放、out-of-date）
 - [x] 在屏幕上渲染彩色三角形（Phase 1 里程碑）
+- [x] `update_texture`：staging、子资源 layout transition 与 `vkCmdCopyBufferToImage`
+- [x] Staging buffer 上传（`update_buffer` 对 GpuOnly 缓冲）
+- [x] Descriptor set / bind group 抽象（uniform buffer、纹理采样）与 push constant
+- [x] mip/layer/aspect 状态、视图、附件、清屏与平面读回
 
 ### 待做
 
-- [ ] `update_texture`：staging buffer + image layout transition + `vkCmdCopyBufferToImage`
-- [ ] Staging buffer 上传（`update_buffer` 对 GpuOnly 缓冲）
-- [ ] Descriptor set / bind group 抽象（uniform buffer、纹理采样）
-- [ ] Push constant 支持
 - [ ] Pipeline cache（加速重建）
 - [ ] Compute pipeline + dispatch
 - [ ] 同步原语（semaphore / fence / event）暴露给上层（用于异步资源传输）
 - [ ] Multi-sampled rendering（MSAA attachment）
 - [ ] Mipmap 生成
-- [ ] Cubemap / 3D 纹理上传
+- [ ] Cubemap / 3D 纹理端到端 GPU 验证与更多 CPU 上传格式
 - [ ] Indirect draw
 - [ ] Query pool（timestamp / occlusion query）
 - [ ] Debug 标签（`vkCmdBeginDebugUtilsLabelEXT` 配合 RenderDoc）
@@ -768,4 +771,4 @@ device->init(window);                           // window 实现 WindowSystem �
 
 ---
 
-*Rover Engine Drivers v0.1.0 — 文档版本与实现同步。*
+验收环境和回归结果见 [Phase 2 验收](PHASE2_ACCEPTANCE.md)。

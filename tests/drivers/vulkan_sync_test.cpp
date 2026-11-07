@@ -68,3 +68,31 @@ TEST_CASE("Vulkan sync: offscreen sampling layout is independent of retained att
 }
 
 #endif
+
+#ifdef ROVER_TEST_VULKAN_SYNC
+    #include "drivers/vulkan/vk_texture_state.h"
+
+TEST_CASE("Vulkan subresources: states and reader scopes are isolated by plane, mip and layer")
+{
+    VkTextureResource image;
+    image.engine_format = Format::D32_SFLOAT_S8_UINT;
+    image.mip_levels    = 2;
+    image.array_layers  = 2;
+    vk_initialize_texture_states(image);
+    auto& depth = vk_texture_state(image, TextureAspect::Depth, 1, 0);
+    vk_track_access(depth, ResourceAccess::TransferWrite);
+    vk_track_access(depth, ResourceAccess::TransferRead);
+    CHECK((depth.sync_access & VK_ACCESS_TRANSFER_WRITE_BIT) != 0);
+    CHECK(vk_texture_state(image, TextureAspect::Depth, 0, 0).access == ResourceAccess::Undefined);
+    CHECK(vk_texture_state(image, TextureAspect::Depth, 1, 1).access == ResourceAccess::Undefined);
+    CHECK(vk_texture_state(image, TextureAspect::Stencil, 1, 0).access == ResourceAccess::Undefined);
+    TextureSubresourceRange result{};
+    CHECK_FALSE(vk_texture_range(image, {TextureAspect::Depth}, result, false));
+    CHECK(vk_texture_range(image, {}, result, false));
+    CHECK(vk_texture_range(image, {TextureAspect::Depth}, result, true));
+    CHECK(vk_texture_layout(image, TextureAspect::Depth, ResourceAccess::ShaderRead, true) ==
+          VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL);
+    CHECK(vk_texture_layout(image, TextureAspect::Stencil, ResourceAccess::ShaderRead, true) ==
+          VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL);
+}
+#endif

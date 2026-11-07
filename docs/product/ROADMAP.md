@@ -9,7 +9,7 @@
 | 版本 | 主题 | 状态 | 完成时间 |
 |------|------|------|---------|
 | **v0.1.0** | Phase 1 — 核心系统 + Vulkan 三角形 | ✅ Done | 2026-04 |
-| **v0.2.0** | Phase 2 — Frame Graph + ECS 场景 + 资源管线 | 🚧 In progress | — |
+| **v0.2.0** | Phase 2 — Frame Graph + ECS 场景 + 资源管线 | ✅ Done | 2026-11-07 |
 | **v0.3.0** | Phase 3 — 编辑器 GUI/CLI + Asset Browser | ⏳ Planned | — |
 | **v0.4.0** | Phase 4 — 物理 / 音频 / 网络服务 | ⏳ Planned | — |
 | **v0.5.0** | Phase 5 — 跨平台铺开（Windows / macOS） | ⏳ Planned | — |
@@ -47,16 +47,16 @@
 | 子系统 | v0.1 | v0.2 | v0.3 | v0.4 | v0.5 | v1.0 |
 |-------|:----:|:----:|:----:|:----:|:----:|:----:|
 | **core**（log/math/event/task/object/allocator/graphics 抽象） | ✅ | + Variant 完善 | + IO 抽象 | | | |
-| **services/graphics** | — | 🎯 Frame Graph | + 材质系统 | + GPU culling | | |
+| **services/graphics** | — | ✅ Frame Graph | + 材质系统 | + GPU culling | | |
 | **services/physics** | — | — | — | 🎯 刚体 + 碰撞 | + 软体 / 布料 | |
 | **services/audio** | — | — | — | 🎯 混音 + 空间音频 | | |
 | **services/network** | — | — | — | 🎯 传输 + 复制 | + RPC | |
-| **modules/scene** | — | 🎯 EnTT World + 场景树 | + 序列化 | | | |
+| **modules/scene** | — | ✅ EnTT World + 场景树 | + 编辑器集成 | | | |
 | **modules/animation** | — | — | 🎯 骨骼 / 状态机 | + 混合树 | | |
 | **modules/particle** | — | — | 🎯 CPU 粒子 | + GPU 粒子 | | |
 | **modules/ui** | — | — | 🎯 基础控件 | + 主题 | | |
 | **modules/ai** | — | — | — | 🎯 导航 / 行为树 | + 黑板 | |
-| **modules/serialization** | — | 🎯 二进制 + 文本格式 | + 资源压缩 | | | |
+| **modules/serialization** | — | ✅ 二进制 + 文本格式 | + 资源压缩 | | | |
 | **editor/gui** | — | — | 🎯 ImGui 主框架 + Inspector | + Asset Browser | | |
 | **editor/cli** | — | — | 🎯 import/export/build | + 节点编辑命令 | | |
 
@@ -79,19 +79,19 @@
 - ✅ misc/cmake：构建模块（Options / Compiler / Utils / Shader）
 - ✅ docs：架构 + 各子系统权威文档
 
-### Phase 2 — v0.2 (🚧 In progress)
+### Phase 2 — v0.2 (✅ Done)
 
 **目标**：把渲染从 demo 升级为可持续演进的生产路线，并建立 ECS 场景。
 
 里程碑：
-- ✅ `services/graphics/`：Frame Graph（导入资源、单生产者依赖 DAG、确定性拓扑排序、循环/非法引用检查、render-pass 封装），见 [使用契约](../dev/FRAME_GRAPH.md)
+- ✅ `services/graphics/`：Frame Graph（导入资源、按子资源确定生产者的依赖 DAG、确定性拓扑排序、循环/非法引用检查、render-pass 封装），见 [使用契约](../dev/FRAME_GRAPH.md)
 - ✅ Frame Graph 单队列跨 pass 自动 barrier、资源用途与导出状态、Vulkan 持续布局跟踪；`--demo frame-graph` 验证离屏清屏/复制/HostRead 像素回读，见 [ADR-0014](adr/ADR-0014-resource-barriers.md)
 - ✅ Slang 源码及固定依赖纳入 vendor，本地编译 `slangc`；内置 shader 迁移到 Slang
 - ✅ HDR 离屏场景 → 曝光/Reinhard 映射 → 交换链呈现，支持像素回读和窗口缩放验证，见 [后处理](../dev/POST_PROCESS.md)
 - ✅ Frame Graph 显式资源版本，按 RAW/WAR/WAW 排序同一物理资源的多次写入，双版本 GPU 回读验证，见 [ADR-0016](adr/ADR-0016-frame-graph-resource-versions.md)
 - ✅ Frame Graph 瞬态纹理/缓冲与资源池：按使用区间复用，按 GPU 完成序号隔离在途帧；后处理和相机迁入图，见 [瞬态资源](../dev/TRANSIENT_RESOURCES.md)
 - ✅ Vulkan 头文件源码 vendoring、`rover lint` 与可重复 GPU 回归脚本
-- 🎯 Phase 2 收尾：mip/layer/aspect 子资源跟踪、Release/sanitizer 最终验收，见 [验收清单](../dev/PHASE2_ACCEPTANCE.md)
+- ✅ mip/layer/aspect 子资源跟踪、局部版本继承与视图；Debug/Release、ASan/UBSan/泄漏检查及各 13 项 GPU 回归通过，见 [验收清单](../dev/PHASE2_ACCEPTANCE.md)
 - ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
 - ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）
@@ -108,12 +108,13 @@
 **目标**：编辑器骨架可用，AI Agent 能通过 CLI 完成基本编辑流程。
 
 里程碑：
+- 🎯 资产管线：外部模型/图片导入、材质/纹理持久引用、磁盘 Asset Registry；加载场景时恢复外部 GPU 资源
 - 🎯 `editor/gui/`：ImGui 主循环 + Dock + Inspector + Asset Browser + Scene Tree
 - 🎯 `editor/cli/`：`import / export / build / run / list` 命令族
 - 🎯 `modules/animation/`：骨骼 + 状态机（无混合树）
 - 🎯 `modules/particle/`：CPU 粒子系统
 - 🎯 `modules/ui/`：基础控件（button / label / panel / image）
-- 🎯 测试：services / drivers 集成测试，`GraphicsDevice` mock
+- 🎯 测试：扩展已有 GraphicsDevice mock 与本机 GPU 回归，接入 GPU CI
 
 退出条件：能在编辑器中导入一个 GLTF 模型，把它放到场景里，运行时正确显示。
 

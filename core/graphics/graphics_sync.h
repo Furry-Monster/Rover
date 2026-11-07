@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/graphics/graphics_types.h"
+#include "core/graphics/texture_subresource.h"
 
 namespace rover
 {
@@ -64,8 +65,9 @@ namespace rover
 
     struct TextureBarrier
     {
-        TextureHandle  texture = INVALID_HANDLE;
-        ResourceAccess access  = ResourceAccess::Undefined;
+        TextureHandle           texture = INVALID_HANDLE;
+        ResourceAccess          access  = ResourceAccess::Undefined;
+        TextureSubresourceRange range{};
     };
 
 } // namespace rover

@@ -13,12 +13,9 @@ namespace rover
     // ---------------------------------------------------------------------------
     // Frame Graph virtual resources.
     //
-    // A `RenderResource` is the *graph-side* description of a buffer or texture.
-    // Real GPU handles are produced by the `GraphicsDevice` either ahead of time
-    // (imported resources) or transiently during compile (managed resources). For
-    // Phase 2 we only support imported resources -- the caller pre-creates the
-    // GPU resource via `GraphicsDevice` and hands the handle to the frame graph.
-    // Explicit versions borrow the imported handles; allocation is separate.
+    // A RenderResource describes one logical version. Imported handles belong
+    // to the caller; transient handles are resolved from a persistent pool after
+    // compilation. Explicit versions share one physical root and GPU object.
     // ---------------------------------------------------------------------------
 
     enum class ResourceKind : u8
@@ -30,11 +27,17 @@ namespace rover
     enum class ResourceLifetime : u8
     {
         Imported,  // Owned by the caller, reused frame to frame (e.g. swapchain).
-        Transient, // Reserved for graph-managed allocation.
+        Transient, // Owned and leased by TransientResourcePool.
     };
 
     using RenderResourceId                         = u32;
     constexpr RenderResourceId INVALID_RESOURCE_ID = 0xFFFFFFFFu;
+
+    struct RenderResourceExport
+    {
+        ResourceAccess          access = ResourceAccess::Undefined;
+        TextureSubresourceRange range{};
+    };
 
     struct RenderResource
     {
@@ -42,14 +45,15 @@ namespace rover
         ResourceKind     kind     = ResourceKind::Texture;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
 
-        // Logical versions share their imported root's GPU handles. A version
+        // Logical versions share their physical root's GPU handles. A version
         // orders an overwrite; it does not allocate a copy of the old contents.
         RenderResourceId physical_resource = INVALID_RESOURCE_ID;
         RenderResourceId previous_version  = INVALID_RESOURCE_ID;
 
         // Undefined leaves the last graph access unchanged; other values request
         // an export transition after all passes finish recording successfully.
-        ResourceAccess final_access = ResourceAccess::Undefined;
+        ResourceAccess                    final_access = ResourceAccess::Undefined;
+        std::vector<RenderResourceExport> exports;
 
         // Imported handles (one of texture / buffer is set depending on `kind`).
         TextureHandle texture = INVALID_HANDLE;
@@ -58,7 +62,7 @@ namespace rover
         // Optional caller-created framebuffer containing this color texture.
         FramebufferHandle framebuffer = INVALID_HANDLE;
 
-        // Geometry hints; used by transient allocator when implemented.
+        // Base dimensions and format used by attachment validation and allocation.
         u32    width  = 0;
         u32    height = 0;
         Format format = Format::UNDEFINED;
@@ -90,8 +94,9 @@ namespace rover
         RenderResourceId resource = INVALID_RESOURCE_ID;
         // Undefined here means the source is resolved from the driver's tracked
         // state, not that existing physical image contents should be discarded.
-        ResourceAccess before = ResourceAccess::Undefined;
-        ResourceAccess after  = ResourceAccess::Undefined;
+        ResourceAccess          before = ResourceAccess::Undefined;
+        ResourceAccess          after  = ResourceAccess::Undefined;
+        TextureSubresourceRange range{};
     };
 
 } // namespace rover

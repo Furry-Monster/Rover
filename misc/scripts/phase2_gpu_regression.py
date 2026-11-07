@@ -19,6 +19,7 @@ def cases(output: Path) -> list[tuple[str, list[str]]]:
     scene = str(scenes / "primitives.rscene")
     result.extend([
         ("frame-graph", ["--demo", "frame-graph", "--frames", "32"]),
+        ("subresources", ["--demo", "subresources", "--frames", "8"]),
         ("triangle", ["--demo", "triangle", "--frames", "8"]),
         ("inflight", ["--scene", scene, "--frames", "120"]),
         ("resize", ["--scene", scene, "--frames", "8", "--verify-rendering", "--resize-test",
@@ -41,6 +42,8 @@ def inspect_log(name: str, code: int, log: str) -> list[str]:
     if name in ("primitives", "hierarchy", "depth", "orthographic", "courtyard", "resize",
                 "exposure-low", "exposure-high", "tone-none") and log.count("Scene readback verified:") != 8:
         errors.append("expected 8 verified scene readbacks")
+    if name == "subresources" and "Subresources GPU verified: 8 frames, 3 mips x 2 layers" not in log:
+        errors.append("mip/layer/view and depth/stencil verification is missing")
     if name == "resize" and "960x540" not in log:
         errors.append("resized target was not observed")
     if name == "inflight":

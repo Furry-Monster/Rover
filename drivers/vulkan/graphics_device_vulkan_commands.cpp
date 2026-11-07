@@ -87,13 +87,14 @@ namespace rover
         }
 
         std::vector<TextureBarrier> attachments;
-        for (auto texture : fb_res->color_attachments)
+        for (usize i = 0; i < fb_res->color_attachments.size(); ++i)
         {
-            attachments.push_back({texture, ResourceAccess::ColorAttachment});
+            attachments.push_back(
+                {fb_res->color_attachments[i], ResourceAccess::ColorAttachment, fb_res->color_ranges[i]});
         }
         if (fb_res->depth_stencil != INVALID_HANDLE)
         {
-            attachments.push_back({fb_res->depth_stencil, ResourceAccess::DepthStencilAttachment});
+            attachments.push_back({fb_res->depth_stencil, ResourceAccess::DepthStencilAttachment, fb_res->depth_range});
         }
         // Also supports direct device clients such as the legacy triangle demo.
         if (!cmd_resource_barriers(cmd, {}, attachments))

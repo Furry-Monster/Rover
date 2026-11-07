@@ -25,6 +25,7 @@
 | [ADR-0015](ADR-0015-offscreen-post-process.md) | Slang 编译与离屏场景后处理 | Accepted | 2026-11-07 |
 | [ADR-0016](ADR-0016-frame-graph-resource-versions.md) | Frame Graph 资源版本与覆盖依赖 | Accepted | 2026-11-07 |
 | [ADR-0017](ADR-0017-frame-graph-transient-resources.md) | Frame Graph 瞬态资源与提交完成回收 | Accepted | 2026-11-07 |
+| [ADR-0018](ADR-0018-texture-subresources.md) | 纹理子资源访问、视图与同步 | Accepted | 2026-11-07 |
 
 ---
 

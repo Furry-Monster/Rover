@@ -2,6 +2,7 @@
 #include "drivers/vulkan/graphics_device_vulkan.h"
 #include "drivers/vulkan/vk_format.h"
 #include "drivers/vulkan/vk_sync.h"
+#include "drivers/vulkan/vk_texture_state.h"
 
 #include <cstring>
 
@@ -309,12 +310,14 @@ namespace rover
         alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
         VkTextureResource res{};
-        res.format       = image_info.format;
-        res.extent       = image_info.extent;
-        res.mip_levels   = desc.mip_levels;
-        res.array_layers = image_info.arrayLayers;
-        res.owns_image   = true;
-        res.usage        = image_info.usage;
+        res.format        = image_info.format;
+        res.engine_format = desc.format;
+        res.type          = desc.type;
+        res.extent        = image_info.extent;
+        res.mip_levels    = desc.mip_levels;
+        res.array_layers  = image_info.arrayLayers;
+        res.owns_image    = true;
+        res.usage         = image_info.usage;
 
         const VkResult result =
             vmaCreateImage(vma_allocator_, &image_info, &alloc_info, &res.image, &res.allocation, nullptr);
@@ -325,9 +328,18 @@ namespace rover
         }
 
         VkImageViewCreateInfo view_info{};
-        view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view_info.image                           = res.image;
-        view_info.viewType                        = to_vk_image_view_type(desc.type);
+        view_info.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_info.image    = res.image;
+        view_info.viewType = to_vk_image_view_type(desc.type);
+        if (desc.type == TextureType::TextureCube && res.array_layers > 6)
+        {
+            view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+        }
+        if (desc.type == TextureType::Texture2D && res.array_layers > 1)
+        {
+            view_info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        }
+        res.view_type                             = view_info.viewType;
         view_info.format                          = res.format;
         view_info.subresourceRange.aspectMask     = vk_image_aspect(res.format);
         view_info.subresourceRange.baseMipLevel   = 0;
@@ -342,6 +354,7 @@ namespace rover
             return INVALID_HANDLE;
         }
 
+        vk_initialize_texture_states(res);
         return textures_.add(res);
     }
 
@@ -360,6 +373,10 @@ namespace rover
         {
             return;
         }
+        for (const auto& view : res.views)
+        {
+            vkDestroyImageView(device_.logical(), view.view, nullptr);
+        }
         if (res.view != VK_NULL_HANDLE)
         {
             vkDestroyImageView(device_.logical(), res.view, nullptr);
@@ -370,84 +387,92 @@ namespace rover
         }
     }
 
-    void GraphicsDeviceVulkan::update_texture(TextureHandle handle, const void* data, usize size)
+    void GraphicsDeviceVulkan::update_texture(TextureHandle           handle,
+                                              const void*             data,
+                                              usize                   size,
+                                              TextureSubresourceRange requested)
     {
-        auto* res = textures_.get(handle);
-        if (res == nullptr || data == nullptr || size == 0)
+        auto*                   image = textures_.get(handle);
+        TextureSubresourceRange range{};
+        const bool              separate = device_.separate_depth_stencil_layouts();
+        if (!image || !data || !image->owns_image || !frame_command_lists_.empty() ||
+            !vk_texture_range(*image, requested, range, separate) || range.mip_count != 1)
         {
-            ROVER_LOG_WARN("update_texture: invalid args");
+            ROVER_LOG_ERROR("update_texture: invalid upload range or frame recording has begun");
             return;
         }
-        if (!frame_command_lists_.empty() || !res->owns_image || res->mip_levels != 1 || res->array_layers != 1 ||
-            vk_image_aspect(res->format) != VK_IMAGE_ASPECT_COLOR_BIT)
+        const auto       bytes = texture_plane_bytes(image->engine_format, range.aspects);
+        const VkExtent3D extent{texture_mip_extent(image->extent.width, range.base_mip),
+                                texture_mip_extent(image->extent.height, range.base_mip),
+                                texture_mip_extent(image->extent.depth, range.base_mip)};
+        const u64 required = static_cast<u64>(extent.width) * extent.height * extent.depth * range.layer_count * bytes;
+        if (!bytes || required != size)
         {
-            ROVER_LOG_ERROR("update_texture: requires a single-mip/layer color texture before frame recording");
+            ROVER_LOG_ERROR("update_texture: upload size must match the selected tightly packed plane");
             return;
         }
-
-        // Stage host -> staging buffer.
-        VkBufferCreateInfo staging_info{};
-        staging_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        staging_info.size        = size;
-        staging_info.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        staging_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VmaAllocationCreateInfo staging_alloc{};
-        staging_alloc.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        staging_alloc.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VkBuffer          staging     = VK_NULL_HANDLE;
-        VmaAllocation     staging_mem = nullptr;
-        VmaAllocationInfo info{};
-        if (vmaCreateBuffer(vma_allocator_, &staging_info, &staging_alloc, &staging, &staging_mem, &info) != VK_SUCCESS)
+        VkBufferCreateInfo info{};
+        info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        info.size        = size;
+        info.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VmaAllocationCreateInfo allocation{};
+        allocation.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        allocation.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        VkBuffer          staging = VK_NULL_HANDLE;
+        VmaAllocation     memory  = nullptr;
+        VmaAllocationInfo mapped{};
+        if (vmaCreateBuffer(vma_allocator_, &info, &allocation, &staging, &memory, &mapped) != VK_SUCCESS)
         {
             ROVER_LOG_ERROR("update_texture: failed to allocate staging buffer");
             return;
         }
-        std::memcpy(info.pMappedData, data, size);
-        vmaFlushAllocation(vma_allocator_, staging_mem, 0, size);
-
-        const bool sampled = (res->usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
+        std::memcpy(mapped.pMappedData, data, size);
+        vmaFlushAllocation(vma_allocator_, memory, 0, size);
+        const bool sampled = (image->usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
         const bool copied =
             one_shot_submit(device_.logical(), command_pool_, device_.graphics_queue(), [&](VkCommandBuffer cmd) {
-                // 1) Transition image to TRANSFER_DST_OPTIMAL.
-                VkImageMemoryBarrier b{};
-                b.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                const auto source                 = vk_access_scope(res->access);
-                b.oldLayout                       = source.layout;
-                b.newLayout                       = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                b.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-                b.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-                b.image                           = res->image;
-                b.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-                b.subresourceRange.baseMipLevel   = 0;
-                b.subresourceRange.levelCount     = res->mip_levels;
-                b.subresourceRange.baseArrayLayer = 0;
-                b.subresourceRange.layerCount     = res->array_layers;
-                b.srcAccessMask                   = res->sync_access;
-                b.dstAccessMask                   = VK_ACCESS_TRANSFER_WRITE_BIT;
-                vkCmdPipelineBarrier(
-                    cmd, res->sync_stages, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &b);
-
-                // 2) Copy buffer -> image (mip 0, array layer 0 only for Phase 2).
-                VkBufferImageCopy region{};
-                region.bufferOffset                    = 0;
-                region.bufferRowLength                 = 0;
-                region.bufferImageHeight               = 0;
-                region.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-                region.imageSubresource.mipLevel       = 0;
-                region.imageSubresource.baseArrayLayer = 0;
-                region.imageSubresource.layerCount     = 1;
-                region.imageOffset                     = {0, 0, 0};
-                region.imageExtent                     = res->extent;
-                vkCmdCopyBufferToImage(cmd, staging, res->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
+                std::vector<VkImageMemoryBarrier> barriers;
+                VkPipelineStageFlags              source = 0;
+                for_texture_cells(range, [&](auto aspect, auto mip, auto layer) {
+                    const auto&          state = vk_texture_state(*image, aspect, mip, layer);
+                    VkImageMemoryBarrier b{};
+                    b.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    b.srcAccessMask       = state.sync_access;
+                    b.dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    b.oldLayout           = vk_texture_layout(*image, aspect, state.access, separate);
+                    b.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    b.image               = image->image;
+                    b.subresourceRange    = {vk_texture_aspects(aspect), mip, 1, layer, 1};
+                    barriers.push_back(b);
+                    source |= state.sync_stages;
+                });
+                vkCmdPipelineBarrier(cmd,
+                                     source,
+                                     VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                     0,
+                                     0,
+                                     nullptr,
+                                     0,
+                                     nullptr,
+                                     static_cast<u32>(barriers.size()),
+                                     barriers.data());
+                VkBufferImageCopy copy{};
+                copy.imageSubresource = {
+                    vk_texture_aspects(range.aspects), range.base_mip, range.base_layer, range.layer_count};
+                copy.imageExtent = extent;
+                vkCmdCopyBufferToImage(cmd, staging, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
                 if (sampled)
                 {
-                    // 3) Uploaded sampled images retain the legacy shader-read state.
-                    b.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    b.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                    b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                    for (auto& b : barriers)
+                    {
+                        b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                        b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                        b.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                        b.newLayout = vk_texture_layout(*image, range.aspects, ResourceAccess::ShaderRead, separate);
+                    }
                     vkCmdPipelineBarrier(cmd,
                                          VK_PIPELINE_STAGE_TRANSFER_BIT,
                                          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -456,24 +481,83 @@ namespace rover
                                          nullptr,
                                          0,
                                          nullptr,
-                                         1,
-                                         &b);
+                                         static_cast<u32>(barriers.size()),
+                                         barriers.data());
                 }
             });
         if (copied)
         {
-            vk_track_access(*res, ResourceAccess::TransferWrite);
-            if (sampled)
-            {
-                vk_track_access(*res, ResourceAccess::ShaderRead);
-            }
+            for_texture_cells(range, [&](auto aspect, auto mip, auto layer) {
+                auto& state = vk_texture_state(*image, aspect, mip, layer);
+                vk_track_access(state, ResourceAccess::TransferWrite);
+                if (sampled)
+                {
+                    vk_track_access(state, ResourceAccess::ShaderRead);
+                }
+            });
         }
         else
         {
             ROVER_LOG_ERROR("update_texture: staging copy submit failed");
         }
+        vmaDestroyBuffer(vma_allocator_, staging, memory);
+    }
 
-        vmaDestroyBuffer(vma_allocator_, staging, staging_mem);
+    VkImageView GraphicsDeviceVulkan::texture_view(TextureHandle           handle,
+                                                   TextureSubresourceRange requested,
+                                                   bool                    attachment)
+    {
+        auto*                   image = textures_.get(handle);
+        TextureSubresourceRange range{};
+        if (!image ||
+            !normalize_texture_range(image->engine_format, image->mip_levels, image->array_layers, requested, range) ||
+            (attachment && (range.mip_count != 1 || range.layer_count != 1 || image->type == TextureType::Texture3D)))
+        {
+            ROVER_LOG_ERROR("texture_view: invalid subresource range");
+            return VK_NULL_HANDLE;
+        }
+        VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D;
+        if (image->type == TextureType::Texture3D)
+        {
+            type = VK_IMAGE_VIEW_TYPE_3D;
+        }
+        else if (!attachment && image->type == TextureType::TextureCube && range.base_layer % 6 == 0 &&
+                 range.layer_count % 6 == 0)
+        {
+            type = range.layer_count == 6 ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+        }
+        else if (range.layer_count > 1)
+        {
+            type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        }
+        TextureSubresourceRange full{};
+        normalize_texture_range(image->engine_format, image->mip_levels, image->array_layers, {}, full);
+        if (range == full && type == image->view_type)
+        {
+            return image->view;
+        }
+        for (const auto& cached : image->views)
+        {
+            if (cached.range == range)
+            {
+                return cached.view;
+            }
+        }
+        VkImageViewCreateInfo info{};
+        info.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        info.image            = image->image;
+        info.viewType         = type;
+        info.format           = image->format;
+        info.subresourceRange = {
+            vk_texture_aspects(range.aspects), range.base_mip, range.mip_count, range.base_layer, range.layer_count};
+        VkImageView view = VK_NULL_HANDLE;
+        if (vkCreateImageView(device_.logical(), &info, nullptr, &view) != VK_SUCCESS)
+        {
+            ROVER_LOG_ERROR("texture_view: vkCreateImageView failed");
+            return VK_NULL_HANDLE;
+        }
+        image->views.push_back({range, view});
+        return view;
     }
 
     SamplerHandle GraphicsDeviceVulkan::create_sampler(const SamplerDesc& desc)

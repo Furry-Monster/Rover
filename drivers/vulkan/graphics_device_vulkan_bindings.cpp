@@ -1,6 +1,8 @@
 #include "core/log/log.h"
 #include "drivers/vulkan/graphics_device_vulkan.h"
+#include "drivers/vulkan/vk_texture_state.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace rover
@@ -133,6 +135,11 @@ namespace rover
             return INVALID_HANDLE;
         }
 
+        auto fail = [&]() {
+            vkFreeDescriptorSets(device_.logical(), res.pool, 1, &res.set);
+            return INVALID_HANDLE;
+        };
+        std::vector<u32> used_bindings;
         // Build write info for each entry. Buffer/image info structs must outlive
         // the writes vector during the call.
         std::vector<VkWriteDescriptorSet>   writes;
@@ -144,6 +151,16 @@ namespace rover
 
         for (const auto& e : desc.entries)
         {
+            const auto slot = std::find_if(layout->entries.begin(), layout->entries.end(), [&](const auto& entry) {
+                return entry.binding == e.binding && entry.type == e.type;
+            });
+            if (slot == layout->entries.end() ||
+                std::find(used_bindings.begin(), used_bindings.end(), e.binding) != used_bindings.end())
+            {
+                ROVER_LOG_ERROR("create_bind_group: missing, mismatched or duplicate binding slot");
+                return fail();
+            }
+            used_bindings.push_back(e.binding);
             VkWriteDescriptorSet w{};
             w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             w.dstSet          = res.set;
@@ -155,10 +172,11 @@ namespace rover
             if (e.type == BindingType::UniformBuffer || e.type == BindingType::StorageBuffer)
             {
                 auto* buf = buffers_.get(e.buffer);
-                if (buf == nullptr)
+                if (buf == nullptr || e.buffer_offset >= buf->size ||
+                    (e.buffer_size && e.buffer_size > buf->size - e.buffer_offset))
                 {
-                    ROVER_LOG_WARN("BindGroup buffer handle invalid (binding {})", e.binding);
-                    continue;
+                    ROVER_LOG_ERROR("BindGroup buffer handle/range invalid (binding {})", e.binding);
+                    return fail();
                 }
                 VkDescriptorBufferInfo bi{};
                 bi.buffer = buf->buffer;
@@ -175,20 +193,46 @@ namespace rover
                     auto* tex = textures_.get(e.texture);
                     if (tex == nullptr)
                     {
-                        ROVER_LOG_WARN("BindGroup texture handle invalid (binding {})", e.binding);
-                        continue;
+                        ROVER_LOG_ERROR("BindGroup texture handle invalid (binding {})", e.binding);
+                        return fail();
                     }
-                    ii.imageView   = tex->view;
-                    ii.imageLayout = e.type == BindingType::SampledTexture ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                                                           : VK_IMAGE_LAYOUT_GENERAL;
+                    const auto usage =
+                        e.type == BindingType::SampledTexture ? VK_IMAGE_USAGE_SAMPLED_BIT : VK_IMAGE_USAGE_STORAGE_BIT;
+                    if ((tex->usage & usage) == 0)
+                    {
+                        ROVER_LOG_ERROR("create_bind_group: image usage does not permit binding type");
+                        return fail();
+                    }
+                    TextureSubresourceRange range{};
+                    if (!normalize_texture_range(
+                            tex->engine_format, tex->mip_levels, tex->array_layers, e.texture_range, range) ||
+                        (range.aspects != TextureAspect::Color && range.aspects != TextureAspect::Depth &&
+                         range.aspects != TextureAspect::Stencil))
+                    {
+                        ROVER_LOG_ERROR("create_bind_group: image bindings require a valid single aspect");
+                        return fail();
+                    }
+                    ii.imageView = texture_view(e.texture, range, false);
+                    if (!ii.imageView)
+                    {
+                        return fail();
+                    }
+                    ii.imageLayout =
+                        vk_texture_layout(*tex,
+                                          range.aspects,
+                                          e.type == BindingType::SampledTexture ? ResourceAccess::ShaderRead
+                                                                                : ResourceAccess::StorageRead,
+                                          device_.separate_depth_stencil_layouts());
                 }
                 if (e.type == BindingType::Sampler)
                 {
                     VkSampler* s = samplers_.get(e.sampler);
-                    if (s != nullptr)
+                    if (s == nullptr)
                     {
-                        ii.sampler = *s;
+                        ROVER_LOG_ERROR("create_bind_group: invalid sampler");
+                        return fail();
                     }
+                    ii.sampler = *s;
                 }
                 image_infos.push_back(ii);
                 w.pImageInfo = &image_infos.back();

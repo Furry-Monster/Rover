@@ -35,7 +35,7 @@ if (graph.compile() && graph.prepare_resources(pool))
 }
 ```
 
-颜色目标使用 `set_render_target(pass, render_pass, color, clear, depth)`。颜色与可选深度形成隐式写入；池在准备阶段创建与缓存 framebuffer。已有 import 和 `set_color_attachment` 继续支持调用方提供的 framebuffer。
+颜色目标使用 `set_render_target(pass, render_pass, color, clear, depth)`。颜色与可选深度形成隐式写入；池在准备阶段创建与缓存 framebuffer。color_range/depth_range 选择单 mip/layer，池按所选 mip 计算尺寸。已有 import 和 `set_color_attachment` 继续支持调用方提供的 framebuffer。详见 [纹理子资源](TEXTURE_SUBRESOURCES.md)。
 
 ## 使用区间与复用
 
@@ -45,7 +45,7 @@ if (graph.compile() && graph.prepare_resources(pool))
 - 主机可见缓冲保留整帧租约，防止提交前的 CPU 更新覆盖前一 pass 的数据。
 - 跨帧复用要求 `last_use_serial <= device.completed_serial()`，获取交换链图像不作为 CPU 写入安全证明。
 - 版本与池内复用均保留 driver 的实际布局和访问状态；新逻辑资源的首个 barrier 由 driver 解析实际源状态。
-- framebuffer 与 bind group 不可变，按具体句柄和描述缓存；调用方在 pass 中声明其资源用途。
+- framebuffer 与 bind group 不可变，按具体句柄、描述和纹理子资源范围缓存；调用方在 pass 中声明其资源用途。
 
 ## 失败与清理
 

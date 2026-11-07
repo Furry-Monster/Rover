@@ -187,7 +187,19 @@ namespace rover
         VkPhysicalDeviceFeatures features{};
         features.samplerAnisotropy = VK_TRUE;
 
+        VkPhysicalDeviceVulkan12Features available{};
+        available.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        VkPhysicalDeviceFeatures2 query{};
+        query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        query.pNext = &available;
+        vkGetPhysicalDeviceFeatures2(physical_, &query);
+        VkPhysicalDeviceVulkan12Features enabled{};
+        enabled.sType                       = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        enabled.separateDepthStencilLayouts = available.separateDepthStencilLayouts;
+        separate_depth_stencil_layouts_     = enabled.separateDepthStencilLayouts == VK_TRUE;
+
         VkDeviceCreateInfo device_info{};
+        device_info.pNext                   = &enabled;
         device_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         device_info.queueCreateInfoCount    = static_cast<u32>(queue_infos.size());
         device_info.pQueueCreateInfos       = queue_infos.data();
@@ -214,12 +226,13 @@ namespace rover
             vkDestroyDevice(device_, nullptr);
             device_ = VK_NULL_HANDLE;
         }
-        physical_       = VK_NULL_HANDLE;
-        graphics_queue_ = VK_NULL_HANDLE;
-        present_queue_  = VK_NULL_HANDLE;
-        queue_families_ = {};
-        properties_     = {};
-        device_name_[0] = '\0';
+        physical_                       = VK_NULL_HANDLE;
+        graphics_queue_                 = VK_NULL_HANDLE;
+        present_queue_                  = VK_NULL_HANDLE;
+        queue_families_                 = {};
+        properties_                     = {};
+        separate_depth_stencil_layouts_ = false;
+        device_name_[0]                 = '\0';
     }
 
 } // namespace rover

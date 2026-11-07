@@ -140,7 +140,7 @@ namespace rover
 
         void* map_buffer(BufferHandle h) override { return buffers.at(h).data(); }
 
-        bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle) override
+        bool cmd_copy_texture_to_buffer(CommandListHandle, TextureHandle, BufferHandle, TextureCopyRegion = {}) override
         {
             return copy_succeeds;
         }

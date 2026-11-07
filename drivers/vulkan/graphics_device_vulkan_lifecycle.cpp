@@ -1,6 +1,7 @@
 #include "core/log/log.h"
 #include "drivers/vulkan/graphics_device_vulkan.h"
 #include "drivers/vulkan/vk_format.h"
+#include "drivers/vulkan/vk_texture_state.h"
 
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -219,6 +220,10 @@ namespace rover
             {
                 return;
             }
+            for (const auto& view : res.views)
+            {
+                vkDestroyImageView(device_.logical(), view.view, nullptr);
+            }
             if (res.view != VK_NULL_HANDLE)
             {
                 vkDestroyImageView(device_.logical(), res.view, nullptr);
@@ -345,15 +350,17 @@ namespace rover
         for (usize i = 0; i < images.size(); ++i)
         {
             VkTextureResource res{};
-            res.image             = images[i];
-            res.view              = views[i];
-            res.allocation        = nullptr;
-            res.format            = swapchain_.image_format();
-            res.extent            = {swapchain_.extent().width, swapchain_.extent().height, 1};
-            res.mip_levels        = 1;
-            res.array_layers      = 1;
-            res.owns_image        = false;
-            res.usage             = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            res.image         = images[i];
+            res.view          = views[i];
+            res.allocation    = nullptr;
+            res.format        = swapchain_.image_format();
+            res.engine_format = from_vk_format(res.format);
+            res.extent        = {swapchain_.extent().width, swapchain_.extent().height, 1};
+            res.mip_levels    = 1;
+            res.array_layers  = 1;
+            res.owns_image    = false;
+            res.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            vk_initialize_texture_states(res);
             const TextureHandle h = textures_.add(res);
             swapchain_texture_handles_.push_back(h);
         }

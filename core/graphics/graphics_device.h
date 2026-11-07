@@ -26,9 +26,12 @@ namespace rover
         virtual void         unmap_buffer(BufferHandle handle)                                                  = 0;
         virtual void         update_buffer(BufferHandle handle, const void* data, usize size, usize offset = 0) = 0;
 
-        virtual TextureHandle create_texture(const TextureDesc& desc)                            = 0;
-        virtual void          destroy_texture(TextureHandle handle)                              = 0;
-        virtual void          update_texture(TextureHandle handle, const void* data, usize size) = 0;
+        virtual TextureHandle create_texture(const TextureDesc& desc)                                  = 0;
+        virtual void          destroy_texture(TextureHandle handle)                                    = 0;
+        virtual void          update_texture(TextureHandle           handle,
+                                             const void*             data,
+                                             usize                   size,
+                                             TextureSubresourceRange range = TEXTURE_BASE_SUBRESOURCE) = 0;
 
         virtual SamplerHandle create_sampler(const SamplerDesc& desc) = 0;
         virtual void          destroy_sampler(SamplerHandle handle)   = 0;
@@ -65,9 +68,16 @@ namespace rover
                                            std::span<const BufferBarrier>  buffers,
                                            std::span<const TextureBarrier> textures) = 0;
 
-        // Tightly packed mip 0 RGBA8 2D readback to offset 0. Resources must
+        // Tightly packed single-mip/aspect readback over selected layers. Resources must
         // already be in TransferRead / TransferWrite; false records no copy.
-        virtual bool cmd_copy_texture_to_buffer(CommandListHandle cmd, TextureHandle texture, BufferHandle buffer) = 0;
+        virtual bool cmd_copy_texture_to_buffer(CommandListHandle cmd,
+                                                TextureHandle     texture,
+                                                BufferHandle      buffer,
+                                                TextureCopyRegion region = {}) = 0;
+        virtual bool cmd_clear_texture(CommandListHandle       cmd,
+                                       TextureHandle           texture,
+                                       const ClearValue&       clear,
+                                       TextureSubresourceRange range = {})     = 0;
 
         virtual void cmd_begin_render_pass(CommandListHandle cmd,
                                            FramebufferHandle fb,

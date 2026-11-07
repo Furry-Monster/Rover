@@ -206,6 +206,8 @@ alias rover-cli="$ROVER_ROOT/misc/scripts/rover-cli"
 | `--asan` / `--ubsan` / `--tsan` | 启用 sanitizer（仅 Debug；TSan 与 ASan/UBSan 互斥） |
 | `-D VAR=VAL` | 任意 CMake 定义（可重复） |
 
+`ROVER_OUTPUT_ROOT` 默认是仓库的 `bin/`。独立 sanitizer 构建可通过 `-DROVER_OUTPUT_ROOT=/absolute/path/to/build/sanitizers/bin` 指定输出根目录，Debug/Release 子目录仍按配置生成，避免覆盖正常构建产物。手工改变输出根目录后，使用 CTest 或新路径运行程序；CLI 的 run/test 默认路径仍是仓库 `bin/<type>/`。
+
 ### 5.2 `rover build`
 
 运行 `cmake --build build/<type>`。如果未配置，自动以默认参数调用 configure。
@@ -564,4 +566,4 @@ python3 misc/scripts/phase2_gpu_regression.py --exe bin/debug/rover --output-dir
 
 lint 默认使用 `build/<config>/` 的数据库，`--build-dir` 可指定手工配置的目录。选择编译数据库中的第一方 C/C++ 翻译单元，去重并排除 vendor 与生成文件；头文件随引用它的翻译单元检查。默认读取 `.clang-tidy`，`--checks` 覆盖检查集合，`--fix` 应用修复，任意 clang-tidy 子进程失败使命令返回非零。需要安装 clang-tidy，工具本身使用 Python 标准库。
 
-GPU 脚本需要显示、Vulkan 设备及 Khronos 验证层，保存每项日志、PPM 和 JSON 报告。脚本启用同步验证与 `VK_INSTANCE_LAYERS`，覆盖五个场景、双版本与物理纹理复用、120 帧在途运行、缩放、曝光和色调映射，并检查退出码、验证错误、读回完成数和资源池上界。Release 也可通过此环境变量显式启用验证。
+GPU 脚本需要显示、Vulkan 设备及 Khronos 验证层，保存每项日志、PPM 和 JSON 报告。脚本启用同步验证与 `VK_INSTANCE_LAYERS`，共 13 项，覆盖五个场景、双版本与物理纹理复用、mip/layer 视图及 depth/stencil 平面、120 帧在途运行、缩放、曝光和色调映射，并检查退出码、验证错误、读回完成数和资源池上界。Release 也可通过此环境变量显式启用验证。

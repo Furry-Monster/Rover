@@ -35,10 +35,10 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-004 | 提供 GraphicsDevice 抽象接口（与具体后端解耦） | Implemented | v0.1 | core/graphics/ |
 | F-005 | 支持顶点 + 索引缓冲渲染 | Implemented | v0.1 | cmd_draw / cmd_draw_indexed |
 | F-006 | Slang/HLSL → SPIR-V shader 编译时内联，本地构建编译器 | Implemented | v0.2 | misc/cmake/RoverShader.cmake、vendor/slang |
-| F-007 | 实现 Frame Graph 抽象（依赖 DAG、资源版本、自动 barrier） | Implemented | v0.2 | 导入资源/线性版本覆盖/整个资源粒度/单 graphics queue，见 ADR-0014、ADR-0016 |
-| F-008 | 实现 descriptor set / push constant 抽象 | Accepted | v0.2 | drivers/vulkan/ + 抽象层 |
-| F-009 | 支持 staging buffer 自动上传 | Accepted | v0.2 | update_buffer 对 GpuOnly |
-| F-010 | 实现 update_texture 完整路径（layout transition + copy） | Accepted | v0.2 | drivers/vulkan/ |
+| F-007 | 实现 Frame Graph 抽象（依赖 DAG、资源版本、自动 barrier） | Implemented | v0.2 | 导入/瞬态资源、线性版本、mip/layer/aspect、资源池、单 graphics queue；ADR-0014/0016/0017/0018 |
+| F-008 | 实现 descriptor set / push constant 抽象 | Implemented | v0.2 | drivers/vulkan/ + 抽象层 |
+| F-009 | 支持 staging buffer 自动上传 | Implemented | v0.2 | update_buffer 对 GpuOnly |
+| F-010 | 实现 update_texture 完整路径（layout transition + copy） | Implemented | v0.2 | 所选 mip/layer/aspect 上传与布局转换；subresources GPU 回读 |
 | F-011 | 支持 D3D12 后端 | Accepted | v0.6 | 需先 ADR 决定优先级 |
 | F-012 | 支持 Metal 后端 | Accepted | v0.6+ | macOS/iOS |
 | F-013 | 支持 WebGPU 后端 | Accepted | v1.0 | Web 平台唯一选项 |
@@ -59,7 +59,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-108 | 支持 Web | Accepted | v1.0 | Emscripten + WebGPU |
 | F-109 | 支持游戏控制器（gamepad） | Accepted | v0.3 | SDL_GAMEPAD_* |
 | F-110 | 支持触摸输入 | Accepted | v1.0 | 移动端必备 |
-| F-111 | 提供文件系统抽象 + 平台实现 | Accepted | v0.2 | core/os/ + platform/<os>/file.cpp |
+| F-111 | 提供文件系统抽象 + 平台实现 | Implemented | v0.2 | core/os/ + platform/<os>/file.cpp |
 | F-112 | 支持多窗口 | Deferred | v1.1+ | LinuxPlatform 当前持有单窗口 |
 | F-113 | 支持全屏 / borderless 切换 | Deferred | v0.3 | SDL3 已支持，需暴露 |
 | F-114 | 提供 DPI 缩放查询 | Deferred | v0.3 | 高 DPI 屏幕必备 |
@@ -75,15 +75,15 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-205 | 提供 Job 系统（work-stealing） | Implemented | v0.1 | core/task/ |
 | F-206 | 提供 Object 基类 + ClassDB 反射 | Implemented | v0.1 | core/object/ |
 | F-207 | 提供 RefCounted 引用计数 | Implemented | v0.1 | core/object/ref_counted.h |
-| F-208 | 完善 Variant 类型系统 | Accepted | v0.2 | core/variant/ |
-| F-209 | 提供 Callable（类型擦除调用包装） | Accepted | v0.2 | core/variant/ |
+| F-208 | 完善 Variant 类型系统 | Implemented | v0.2 | core/variant/ |
+| F-209 | 提供 Callable（类型擦除调用包装） | Implemented | v0.2 | core/variant/ |
 | F-210 | 提供时间子系统（Δt / 计时器 / 时间戳） | Implemented | v0.1 | core/time/ |
 
 ### 1.4 服务（Services）
 
 | ID | 描述 | 状态 | 实现版本 / 计划 | 备注 |
 |----|------|------|----------------|-----|
-| F-301 | GraphicsService（场景渲染、材质） | Accepted | v0.2 | services/graphics/ |
+| F-301 | GraphicsService（场景渲染、材质） | Implemented | v0.2 | 图调度、HDR/后处理、固定材质场景；材质资源化随 v0.3 资产管线推进 |
 | F-302 | PhysicsService（刚体、碰撞） | Accepted | v0.4 | 引擎选型待定 |
 | F-303 | AudioService（混音、空间音频） | Accepted | v0.4 | 引擎选型待定 |
 | F-304 | NetworkService（传输、复制、RPC） | Accepted | v0.4 | 自研或 ENet 封装 |
@@ -92,12 +92,12 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 
 | ID | 描述 | 状态 | 实现版本 / 计划 | 备注 |
 |----|------|------|----------------|-----|
-| F-401 | scene 模块（EnTT World + 场景树） | Accepted | v0.2 | modules/scene/ |
+| F-401 | scene 模块（EnTT World + 场景树） | Implemented | v0.2 | modules/scene/ |
 | F-402 | animation 模块（骨骼、状态机） | Accepted | v0.3 | modules/animation/ |
 | F-403 | particle 模块（CPU + GPU 粒子） | Accepted | v0.3+ | modules/particle/ |
 | F-404 | ui 模块（布局、控件、主题） | Accepted | v0.3 | modules/ui/ |
 | F-405 | ai 模块（导航、行为树、黑板） | Accepted | v0.4 | modules/ai/ |
-| F-406 | serialization 模块（资产格式、import/export） | Accepted | v0.2 / v0.3 | JSON/RBIN 场景保存加载已实现；外部资产 import/export 待 Phase 3 |
+| F-406 | serialization 模块（资产格式、import/export） | Accepted | v0.2 已验收 / v0.3 待实现 | JSON/RBIN 场景保存加载与网格路径已验收；外部资产 import/export 按既有路线图在 Phase 3 完成 |
 | F-407 | 场景持久化稳定网格路径，重启加载并恢复 GPU 资源 | Implemented | v0.2 | 内置 cube/quad/sphere；真实 JSON/RBIN 文件往返；ADR-0011 |
 
 ### 1.6 编辑器
@@ -119,7 +119,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-601 | rover-cli 开发者工程脚本（configure/build/run/test/...） | Implemented | v0.1 | misc/scripts/ |
 | F-602 | CMake 模块化（RoverOptions/Compiler/Utils/Shader/Version） | Implemented | v0.1 | misc/cmake/ |
 | F-603 | 自动 Vulkan SDK 检测与验证层启用 | Implemented | v0.1 | misc/scripts/rover/vulkan.py |
-| F-604 | clang-format / clang-tidy 集成 | Implemented | v0.1 | rover format（tidy 待加） |
+| F-604 | clang-format / clang-tidy 集成 | Implemented | v0.1 | rover format / rover lint（clang-tidy） |
 | F-605 | rover lint 子命令（clang-tidy） | Implemented | v0.2 | misc/scripts/ |
 | F-606 | rover watch 子命令（自动增量构建） | Deferred | v0.3 | inotify/fsevents |
 | F-607 | rover bench 子命令 | Deferred | v0.4 | 待 benchmark 框架 |
@@ -156,7 +156,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 |----|------|------|
 | NF-201 | 所有非平凡 Vulkan 调用包裹 `VK_CHECK*` 宏，错误日志含文件 + 行号 | Implemented |
 | NF-202 | Debug 构建启用 Vulkan 验证层（可降级） | Implemented |
-| NF-203 | 启用 ASan / UBSan 选项（互斥；TSan 单独） | Implemented |
+| NF-203 | 启用 ASan / UBSan 选项（可联合；与 TSan 互斥） | Implemented |
 | NF-204 | 主循环每帧上报 frame time / FPS（编辑器可视化） | Accepted |
 | NF-205 | 集成 RenderDoc 调试标签（`vkCmdBeginDebugUtilsLabelEXT`） | Accepted |
 | NF-206 | 支持 GPU profiling（timestamp query） | Accepted |
@@ -166,8 +166,8 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | ID | 描述 | 状态 |
 |----|------|------|
 | NF-301 | core/ 全部子系统单元测试（doctest） | Implemented；覆盖范围见 [测试规范](../standard/TESTING.md#73-当前测试覆盖) |
-| NF-302 | services / drivers 集成测试通过 GraphicsDevice mock | Accepted |
-| NF-303 | CLI 工具具有自身单元测试（misc/scripts/） | Deferred |
+| NF-302 | services / drivers 集成测试通过 GraphicsDevice mock | Implemented；图、资源池、后处理测试与 driver 状态测试 |
+| NF-303 | CLI 工具具有自身单元测试（misc/scripts/） | Implemented；14 项覆盖 shader 工具、lint CLI 与 GPU 报告检查 |
 | NF-304 | 关键渲染输出有 golden image 比对测试 | Deferred |
 
 ### 2.5 可维护性

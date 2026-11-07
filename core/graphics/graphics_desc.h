@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/graphics/graphics_types.h"
+#include "core/graphics/texture_subresource.h"
 
 #include <vector>
 
@@ -89,11 +90,13 @@ namespace rover
 
     struct FramebufferDesc
     {
-        RenderPassHandle           render_pass;
-        std::vector<TextureHandle> color_attachments;
-        TextureHandle              depth_stencil = INVALID_HANDLE;
-        u32                        width;
-        u32                        height;
+        RenderPassHandle                     render_pass;
+        std::vector<TextureHandle>           color_attachments;
+        TextureHandle                        depth_stencil = INVALID_HANDLE;
+        u32                                  width;
+        u32                                  height;
+        std::vector<TextureSubresourceRange> color_ranges;
+        TextureSubresourceRange              depth_range = TEXTURE_BASE_SUBRESOURCE;
     };
 
     // ---------------------------------------------------------------------------
@@ -176,13 +179,14 @@ namespace rover
     // struct keeps the interface non-virtual.
     struct BindGroupEntry
     {
-        u32           binding       = 0;
-        BindingType   type          = BindingType::UniformBuffer;
-        BufferHandle  buffer        = INVALID_HANDLE;
-        usize         buffer_offset = 0;
-        usize         buffer_size   = 0; // 0 means full buffer
-        TextureHandle texture       = INVALID_HANDLE;
-        SamplerHandle sampler       = INVALID_HANDLE;
+        u32                     binding       = 0;
+        BindingType             type          = BindingType::UniformBuffer;
+        BufferHandle            buffer        = INVALID_HANDLE;
+        usize                   buffer_offset = 0;
+        usize                   buffer_size   = 0; // 0 means full buffer
+        TextureHandle           texture       = INVALID_HANDLE;
+        SamplerHandle           sampler       = INVALID_HANDLE;
+        TextureSubresourceRange texture_range{};
     };
 
     struct BindGroupDesc

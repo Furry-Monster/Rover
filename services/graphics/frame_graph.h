@@ -16,8 +16,8 @@ namespace rover
     // FrameGraph: declarative render graph for organizing one frame's worth of
     // passes. Current compilation contract:
     //
-    //   - Resources are imported (no transient allocation).
-    //   - Each version has at most one writer; physical overwrite chains add WAR/WAW.
+    //   - Resources are imported or resolved through a transient resource pool.
+    //   - Each version's subresource cells have one writer; overlaps add RAW/WAR/WAW.
     //   - Independent ready passes use registration order as a tie breaker.
     //   - Resource usages compile into barriers; drivers track physical state.
     // Graph authoring/execution is single-threaded; execution forbids mutation.
@@ -42,6 +42,11 @@ namespace rover
                                         u32               height,
                                         FramebufferHandle fb = INVALID_HANDLE);
 
+        RenderResourceId import_texture(std::string        name,
+                                        TextureHandle      handle,
+                                        const TextureDesc& desc,
+                                        FramebufferHandle  fb = INVALID_HANDLE);
+
         // Imports an existing GPU buffer into the graph.
         RenderResourceId import_buffer(std::string name, BufferHandle handle);
 
@@ -51,15 +56,15 @@ namespace rover
         [[nodiscard]] BindGroupHandle bind_group(RenderBindGroupId id) const;
 
         // Creates the next logical version of the same physical resource.
-        // Chains are linear; old readers finish before the successor's writer.
-        // Each successor needs a writer, and one pass uses only one version.
+        // Chains are linear; overwritten cells wait for their old readers.
+        // Each successor needs a writer and inherits its other cells.
         RenderResourceId create_version(RenderResourceId previous, std::string name = {});
 
         [[nodiscard]] const RenderResource& resource(RenderResourceId id) const;
 
-        // Export the last version for a subsequent GPU use or CPU readback. HostRead
+        // Export cells whose contents survive all versions, for GPU use or readback. HostRead
         // additionally requires GPU completion before mapping on the CPU.
-        void set_final_access(RenderResourceId id, ResourceAccess access);
+        void set_final_access(RenderResourceId id, ResourceAccess access, TextureSubresourceRange range = {});
 
         // ---- Pass registration ----
 
@@ -75,11 +80,13 @@ namespace rover
                                   bool              clear_depth_stencil = false);
 
         // The pool creates/caches this framebuffer after resources are resolved.
-        void set_render_target(u32               pass_index,
-                               RenderPassHandle  render_pass,
-                               RenderResourceId  color,
-                               const ClearValue& clear,
-                               RenderResourceId  depth = INVALID_RESOURCE_ID);
+        void set_render_target(u32                     pass_index,
+                               RenderPassHandle        render_pass,
+                               RenderResourceId        color,
+                               const ClearValue&       clear,
+                               RenderResourceId        depth       = INVALID_RESOURCE_ID,
+                               TextureSubresourceRange color_range = TEXTURE_BASE_SUBRESOURCE,
+                               TextureSubresourceRange depth_range = TEXTURE_BASE_SUBRESOURCE);
 
         // ---- Compile / execute ----
 
@@ -120,7 +127,11 @@ namespace rover
 
         bool prepare_mutation();
         void invalidate();
-        void declare_access(u32 pass_index, RenderResourceId id, ResourceAccess access, bool write);
+        void declare_access(u32                     pass_index,
+                            RenderResourceId        id,
+                            ResourceAccess          access,
+                            bool                    write,
+                            TextureSubresourceRange range);
         bool record_barriers(GraphicsDevice&                           device,
                              CommandListHandle                         cmd,
                              const std::vector<RenderResourceBarrier>& barriers) const;

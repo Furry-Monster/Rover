@@ -43,7 +43,8 @@ include(RoverUtils)
 # Output directories: bin/<config>/  and  bin/<config>/lib/
 # ---------------------------------------------------------------------------
 string(TOLOWER "${CMAKE_BUILD_TYPE}" _build_type_lower)
-set(ROVER_BIN_DIR "${ROVER_ROOT_DIR}/bin/${_build_type_lower}")
+set(ROVER_OUTPUT_ROOT "${ROVER_ROOT_DIR}/bin" CACHE PATH "Root directory for build artifacts")
+set(ROVER_BIN_DIR "${ROVER_OUTPUT_ROOT}/${_build_type_lower}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ROVER_BIN_DIR}/lib")
@@ -53,11 +54,11 @@ foreach (_config Debug Release)
     string(TOUPPER ${_config} _config_upper)
     string(TOLOWER ${_config} _config_lower)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_config_upper}
-        "${ROVER_ROOT_DIR}/bin/${_config_lower}")
+        "${ROVER_OUTPUT_ROOT}/${_config_lower}")
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_config_upper}
-        "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
+        "${ROVER_OUTPUT_ROOT}/${_config_lower}/lib")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_config_upper}
-        "${ROVER_ROOT_DIR}/bin/${_config_lower}/lib")
+        "${ROVER_OUTPUT_ROOT}/${_config_lower}/lib")
 endforeach ()
 
 # ---------------------------------------------------------------------------

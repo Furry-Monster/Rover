@@ -20,6 +20,8 @@ namespace rover
         bool init(VkInstance instance, VkSurfaceKHR surface);
         void shutdown();
 
+        [[nodiscard]] bool separate_depth_stencil_layouts() const { return separate_depth_stencil_layouts_; }
+
         [[nodiscard]] VkPhysicalDevice physical() const { return physical_; }
 
         [[nodiscard]] VkDevice logical() const { return device_; }
@@ -35,10 +37,11 @@ namespace rover
         [[nodiscard]] const VkPhysicalDeviceProperties& properties() const { return properties_; }
 
     private:
-        VkPhysicalDevice           physical_       = VK_NULL_HANDLE;
-        VkDevice                   device_         = VK_NULL_HANDLE;
-        VkQueue                    graphics_queue_ = VK_NULL_HANDLE;
-        VkQueue                    present_queue_  = VK_NULL_HANDLE;
+        bool                       separate_depth_stencil_layouts_ = false;
+        VkPhysicalDevice           physical_                       = VK_NULL_HANDLE;
+        VkDevice                   device_                         = VK_NULL_HANDLE;
+        VkQueue                    graphics_queue_                 = VK_NULL_HANDLE;
+        VkQueue                    present_queue_                  = VK_NULL_HANDLE;
         QueueFamilyIndices         queue_families_;
         VkPhysicalDeviceProperties properties_{};
         char                       device_name_[256] = {};

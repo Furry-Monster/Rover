@@ -53,7 +53,7 @@
 
 ### 2.3 资产虚拟路径（计划）
 
-VFS 引入后（Phase 2，见 [F-111](../product/REQUIREMENTS.md)），代码中以 `res://path/to/asset` 形式引用：
+Phase 2 的 [F-111](../product/REQUIREMENTS.md) 已提供 FileAccess/DirAccess 与 Linux 文件系统实现，场景使用实际文件路径，内置网格使用注册的稳定路径。资产虚拟路径解析随 Phase 3 的资产管线建设，目标协议为：
 
 
 | 协议          | 解析到                   |
@@ -154,7 +154,7 @@ static const std::uint32_t triangle_vs_spv[] = { 0x07230203, ... };
 ### 4.3 工具链
 
 - `toktx`（KTX-Software）：`.png` → `.ktx2`
-- 计划：`./misc/scripts/rover-cli import-textures`（待 Phase 2 实现）
+- 计划：`./misc/scripts/rover-cli import-textures`（Phase 3 资产导入）
 
 ### 4.4 元数据
 

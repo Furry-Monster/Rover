@@ -102,10 +102,10 @@ Slang 配置内联在 `vendor/CMakeLists.txt`，构建静态宿主编译器 `sla
 
 | 库 | 用途 | Phase | License 待审 |
 |----|------|-------|-------------|
-| **tinygltf / cgltf** | GLTF 模型导入 | Phase 2 | MIT (tinygltf) / MIT (cgltf) |
-| **stb_image** | 图片解码（PNG/JPG） | Phase 2 | MIT/Public Domain |
-| **KTX-Software** | KTX2 纹理 | Phase 2 | Apache 2.0 |
-| **Basis Universal** | KTX2 转码后端 | Phase 2 | Apache 2.0 |
+| **tinygltf / cgltf** | GLTF 模型导入 | Phase 3 | MIT (tinygltf) / MIT (cgltf) |
+| **stb_image** | 图片解码（PNG/JPG） | Phase 3 | MIT/Public Domain |
+| **KTX-Software** | KTX2 纹理 | Phase 3 | Apache 2.0 |
+| **Basis Universal** | KTX2 转码后端 | Phase 3 | Apache 2.0 |
 | **miniaudio** 或 **OpenAL Soft** | 音频混音 | Phase 4 | MIT (miniaudio) / LGPL (OpenAL Soft) |
 | **Jolt Physics** 或 **Bullet** | 物理 | Phase 4 | MIT (Jolt) / Zlib (Bullet) |
 | **dxc**（可选） | HLSL → DXIL（D3D12 后端） | Phase 6 | LLVM Apache 2.0 with LLVM Exception |

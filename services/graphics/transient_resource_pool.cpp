@@ -25,7 +25,8 @@ namespace rover
         bool same(const FramebufferDesc& a, const FramebufferDesc& b)
         {
             return a.render_pass == b.render_pass && a.color_attachments == b.color_attachments &&
-                   a.depth_stencil == b.depth_stencil && a.width == b.width && a.height == b.height;
+                   a.depth_stencil == b.depth_stencil && a.width == b.width && a.height == b.height &&
+                   a.color_ranges == b.color_ranges && a.depth_range == b.depth_range;
         }
 
         bool same(const BindGroupDesc& a, const BindGroupDesc& b)
@@ -40,7 +41,7 @@ namespace rover
                 const auto& y = b.entries[i];
                 if (x.binding != y.binding || x.type != y.type || x.buffer != y.buffer ||
                     x.buffer_offset != y.buffer_offset || x.buffer_size != y.buffer_size || x.texture != y.texture ||
-                    x.sampler != y.sampler)
+                    x.sampler != y.sampler || x.texture_range != y.texture_range)
                 {
                     return false;
                 }
@@ -190,8 +191,10 @@ namespace rover
             desc.depth_stencil     = pass.depth_attachment == INVALID_RESOURCE_ID
                                          ? INVALID_HANDLE
                                          : resources[pass.depth_attachment].texture;
-            desc.width             = color.width;
-            desc.height            = color.height;
+            desc.width             = texture_mip_extent(color.width, pass.color_range.base_mip);
+            desc.height            = texture_mip_extent(color.height, pass.color_range.base_mip);
+            desc.color_ranges      = {pass.color_range};
+            desc.depth_range       = pass.depth_range;
             auto found             = std::find_if(
                 framebuffers.begin(), framebuffers.end(), [&](const auto& entry) { return same(entry.desc, desc); });
             if (found == framebuffers.end())

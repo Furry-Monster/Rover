@@ -1,6 +1,7 @@
 #include "core/log/log.h"
 #include "drivers/vulkan/graphics_device_vulkan.h"
 #include "drivers/vulkan/vk_format.h"
+#include "drivers/vulkan/vk_texture_state.h"
 
 #include <vector>
 
@@ -156,27 +157,53 @@ namespace rover
             return INVALID_HANDLE;
         }
 
-        std::vector<VkImageView> views;
-        views.reserve(desc.color_attachments.size() + 1);
-        for (TextureHandle h : desc.color_attachments)
+        if (!desc.color_ranges.empty() && desc.color_ranges.size() != desc.color_attachments.size())
         {
-            auto* tex = textures_.get(h);
-            if (tex == nullptr || tex->view == VK_NULL_HANDLE)
+            ROVER_LOG_ERROR("create_framebuffer: attachment range count mismatch");
+            return INVALID_HANDLE;
+        }
+        std::vector<VkImageView>             views;
+        std::vector<TextureSubresourceRange> color_ranges;
+        TextureSubresourceRange              depth_range{};
+        auto                                 attachment_view =
+            [&](TextureHandle handle, TextureSubresourceRange requested, TextureSubresourceRange& range) {
+                const auto* image = textures_.get(handle);
+                if (!image ||
+                    !normalize_texture_range(
+                        image->engine_format, image->mip_levels, image->array_layers, requested, range) ||
+                    range.mip_count != 1 || range.layer_count != 1 ||
+                    desc.width != texture_mip_extent(image->extent.width, range.base_mip) ||
+                    desc.height != texture_mip_extent(image->extent.height, range.base_mip))
+                {
+                    return VkImageView{VK_NULL_HANDLE};
+                }
+                return texture_view(handle, range, true);
+            };
+        for (usize i = 0; i < desc.color_attachments.size(); ++i)
+        {
+            TextureSubresourceRange range{};
+            const auto              view =
+                attachment_view(desc.color_attachments[i],
+                                desc.color_ranges.empty() ? TEXTURE_BASE_SUBRESOURCE : desc.color_ranges[i],
+                                range);
+            if (!view || range.aspects != TextureAspect::Color)
             {
-                ROVER_LOG_ERROR("create_framebuffer: invalid color attachment");
+                ROVER_LOG_ERROR("create_framebuffer: invalid color attachment view");
                 return INVALID_HANDLE;
             }
-            views.push_back(tex->view);
+            views.push_back(view);
+            color_ranges.push_back(range);
         }
         if (desc.depth_stencil != INVALID_HANDLE)
         {
-            auto* tex = textures_.get(desc.depth_stencil);
-            if (tex == nullptr || tex->view == VK_NULL_HANDLE)
+            const auto view = attachment_view(desc.depth_stencil, desc.depth_range, depth_range);
+            if (!view || depth_range.aspects != texture_aspects(textures_.get(desc.depth_stencil)->engine_format) ||
+                depth_range.aspects == TextureAspect::Color)
             {
-                ROVER_LOG_ERROR("create_framebuffer: invalid depth attachment");
+                ROVER_LOG_ERROR("create_framebuffer: invalid depth attachment view");
                 return INVALID_HANDLE;
             }
-            views.push_back(tex->view);
+            views.push_back(view);
         }
 
         VkFramebufferCreateInfo info{};
@@ -194,6 +221,8 @@ namespace rover
         res.attachment_count  = static_cast<u32>(views.size());
         res.render_pass       = desc.render_pass;
         res.color_attachments = desc.color_attachments;
+        res.color_ranges      = std::move(color_ranges);
+        res.depth_range       = depth_range;
         res.depth_stencil     = desc.depth_stencil;
         if (vkCreateFramebuffer(device_.logical(), &info, nullptr, &res.framebuffer) != VK_SUCCESS)
         {

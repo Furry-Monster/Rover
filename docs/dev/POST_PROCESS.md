@@ -78,5 +78,5 @@ Frame Graph 已支持显式版本与覆盖依赖，见 [资源版本](FRAME_GRAP
 
 ## 后续工作
 
-- 扩展到 mip/layer 子资源与更多后处理 pass。
+- 基于已支持的 [mip/layer/aspect 子资源](TEXTURE_SUBRESOURCES.md) 增加更多后处理 pass。
 - 接入 shader 优化插件时一并登记源码依赖。
