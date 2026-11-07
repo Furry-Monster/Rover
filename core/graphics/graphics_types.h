@@ -86,6 +86,7 @@ namespace rover
     // ---------------------------------------------------------------------------
     enum class BufferUsage : u32
     {
+        None     = 0,
         Vertex   = 1 << 0,
         Index    = 1 << 1,
         Uniform  = 1 << 2,
@@ -100,6 +101,7 @@ namespace rover
     // ---------------------------------------------------------------------------
     enum class TextureUsage : u32
     {
+        None                   = 0,
         Sampled                = 1 << 0,
         Storage                = 1 << 1,
         ColorAttachment        = 1 << 2,

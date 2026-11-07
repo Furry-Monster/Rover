@@ -5,6 +5,9 @@
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
+#include <cstdlib>
+#include <string_view>
+
 namespace rover
 {
 
@@ -26,10 +29,16 @@ namespace rover
         window.get_vulkan_required_extensions(required_extensions);
 
 #ifdef ROVER_DEBUG
-        constexpr bool enable_validation = true;
+        constexpr bool debug_validation = true;
 #else
-        constexpr bool enable_validation = false;
+        constexpr bool debug_validation = false;
 #endif
+
+        const char* requested_layers = std::getenv("VK_INSTANCE_LAYERS");
+        const bool  enable_validation =
+            debug_validation ||
+            (requested_layers &&
+             std::string_view(requested_layers).find("VK_LAYER_KHRONOS_validation") != std::string_view::npos);
 
         if (!instance_.init(required_extensions, enable_validation))
         {

@@ -120,7 +120,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-602 | CMake 模块化（RoverOptions/Compiler/Utils/Shader/Version） | Implemented | v0.1 | misc/cmake/ |
 | F-603 | 自动 Vulkan SDK 检测与验证层启用 | Implemented | v0.1 | misc/scripts/rover/vulkan.py |
 | F-604 | clang-format / clang-tidy 集成 | Implemented | v0.1 | rover format（tidy 待加） |
-| F-605 | rover lint 子命令（clang-tidy） | Accepted | v0.2 | misc/scripts/ |
+| F-605 | rover lint 子命令（clang-tidy） | Implemented | v0.2 | misc/scripts/ |
 | F-606 | rover watch 子命令（自动增量构建） | Deferred | v0.3 | inotify/fsevents |
 | F-607 | rover bench 子命令 | Deferred | v0.4 | 待 benchmark 框架 |
 | F-608 | rover doc 子命令（生成 API 文档） | Deferred | v0.4 | 评估 sphinx / mkdocs |

@@ -9,7 +9,8 @@
 | 理解层级、构建目标和注册顺序 | [ARCHITECTURE](dev/ARCHITECTURE.md) |
 | 查询核心、平台和驱动 API | [CORE](dev/CORE.md)、[PLATFORM](dev/PLATFORM.md)、[DRIVERS](dev/DRIVERS.md) |
 | 加载场景与运行示例 | [SCENE_LOADING](dev/SCENE_LOADING.md)、[内置场景](../main/builtin_assets/scenes/demos/README.md) |
-| 声明渲染依赖、后处理与资源同步 | [FRAME_GRAPH](dev/FRAME_GRAPH.md)、[POST_PROCESS](dev/POST_PROCESS.md) |
+| 声明渲染依赖、后处理与资源同步 | [FRAME_GRAPH](dev/FRAME_GRAPH.md)、[TRANSIENT_RESOURCES](dev/TRANSIENT_RESOURCES.md)、[POST_PROCESS](dev/POST_PROCESS.md) |
+| 查询 Phase 2 剩余工作与验收证据 | [PHASE2_ACCEPTANCE](dev/PHASE2_ACCEPTANCE.md) |
 | 使用构建、运行和调试工具 | [MISC](dev/MISC.md) |
 | 查询目标、需求和设计依据 | [ROADMAP](product/ROADMAP.md)、[REQUIREMENTS](product/REQUIREMENTS.md)、[ADR 索引](product/adr/INDEX.md) |
 | 编写代码与测试 | [命名](standard/NAMING.md)、[代码风格](standard/CODE_STYLE.md)、[架构约束](standard/ARCHITECTURE_RULES.md)、[测试](standard/TESTING.md) |

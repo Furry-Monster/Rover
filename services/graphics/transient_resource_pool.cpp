@@ -254,19 +254,24 @@ namespace rover
         return true;
     }
 
-    void TransientResourcePool::clear()
+    bool TransientResourcePool::clear()
     {
         if (textures_.empty() && buffers_.empty() && framebuffers_.empty() && bindings_.empty())
         {
-            return;
+            return true;
+        }
+        if (recorded_serial_ != 0 && device_.recording_serial() == recorded_serial_)
+        {
+            ROVER_LOG_ERROR("TransientResourcePool: submit the recorded frame before clearing resources");
+            return false;
         }
         device_.wait_idle();
         ++generation_;
-        ROVER_LOG_DEBUG("TransientResourcePool: releasing {} textures, {} buffers, {} framebuffers, {} bindings",
-                        textures_.size(),
-                        buffers_.size(),
-                        framebuffers_.size(),
-                        bindings_.size());
+        ROVER_LOG_INFO("TransientResourcePool: releasing {} textures, {} buffers, {} framebuffers, {} bindings",
+                       textures_.size(),
+                       buffers_.size(),
+                       framebuffers_.size(),
+                       bindings_.size());
         for (const auto& entry : bindings_)
         {
             device_.destroy_bind_group(entry.handle);
@@ -283,9 +288,11 @@ namespace rover
         {
             device_.destroy_buffer(entry.handle);
         }
+        recorded_serial_ = 0;
         bindings_.clear();
         framebuffers_.clear();
         textures_.clear();
         buffers_.clear();
+        return true;
     }
 } // namespace rover

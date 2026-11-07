@@ -4,7 +4,7 @@
 
 ## 声明资源与 pass
 
-调用方创建并导入资源，每个物理纹理或缓冲导入一次，后续写入通过 `create_version(previous, name)` 声明逻辑版本。纹理和缓冲使用独立的句柄命名空间，数值可以相同。每个版本最多一个生产者；`read(id)` 消费该版本生产者的输出。没有生产者的导入版本表示已初始化的外部内容，后继版本必须有生产者。
+资源可通过 `create_texture` / `create_buffer` 声明为瞬态资源，或由调用方创建后导入。每个外部物理纹理或缓冲导入一次，后续写入通过 `create_version(previous, name)` 声明逻辑版本。纹理和缓冲使用独立的句柄命名空间，数值可以相同。每个版本最多一个生产者；`read(id)` 消费该版本生产者的输出。没有生产者的导入版本表示已初始化的外部内容，后继版本必须有生产者。
 
 `read(id)` 默认为 `ShaderRead`。`write(id)` 默认为 `Automatic`：如果资源是本 pass 的颜色附件，则推断为 `ColorAttachment`，否则推断为 `StorageWrite`。显式声明用途时不会被附件覆盖；一个资源在同一 pass 内只能有一种用途。
 
@@ -106,7 +106,7 @@ if (recorded)
 }
 ```
 
-`cmd_copy_texture_to_buffer` 支持单 mip、单层二维 `R8G8B8A8_UNORM/SRGB`，从缓冲偏移 0 写入紧密排列的数据，目标缓冲容量须足够。CPU 读回和资源释放在 GPU 完成后进行；同步上传在本帧命令录制前完成。驱动维护上传后的状态，调用方保证 CPU 写入时相关内存已结束 GPU 读取。
+`cmd_copy_texture_to_buffer` 支持单 mip、单层二维 `R8G8B8A8_UNORM/SRGB`，从缓冲偏移 0 写入紧密排列的数据，目标缓冲容量须足够。瞬态资源在 compile 后通过 `prepare_resources(pool)` 解析句柄与图内绑定，见 [资源池](TRANSIENT_RESOURCES.md)。CPU 读回和资源释放在 GPU 完成后进行；同步上传在本帧命令录制前完成。驱动维护上传后的状态，调用方保证 CPU 写入时相关内存已结束 GPU 读取。
 
 ## 编译与错误
 
@@ -124,11 +124,11 @@ if (recorded)
 
 | 项目 | 当前契约 |
 |------|----------|
-| 同步范围 | 导入资源、整个资源粒度、跨 pass 访问 |
+| 同步范围 | 导入或图内瞬态资源、整个资源粒度、跨 pass 访问 |
 | 执行模型 | 单线程构建与执行，同一 graphics queue 串行记录 |
 | 资源关系 | 物理资源导入一次，显式版本形成线性覆盖链，每个版本最多一个生产者 |
 | 调用方同步 | pass 内部读写切换、原生 API 操作、持久映射写入和跨线程/队列访问由调用方管理；显存别名需要额外跟踪 |
-| 后续工作 | 瞬态分配、异步队列、pass 剔除和子资源跟踪 |
+| 后续工作 | 异步队列、pass 剔除和子资源跟踪 |
 
 `tests/services/frame_graph*_test.cpp` 使用 mock 验证拓扑顺序、错误图、用途验证、barrier 批次/位置、读回导出及失败边界。版本测试还覆盖三个连续版本、外部初始内容、全部 120 种五 pass 注册排列、跨版本 barrier、WAR 循环和非法版本声明。`tests/drivers/vulkan_sync_test.cpp` 在 CPU 上验证读写范围保留和布局映射。运行 `ctest --test-dir build --output-on-failure`。
 
@@ -140,7 +140,7 @@ VK_LAYER_VALIDATE_SYNC=1 bin/debug/rover --demo triangle --frames 8
 VK_LAYER_VALIDATE_SYNC=1 bin/debug/rover --demo mesh --scene main/builtin_assets/scenes/demos/primitives.rscene --frames 8
 ```
 
-`frame-graph` 每帧将同一张 RGBA8 纹理写入两种颜色，并在每次覆盖前分别复制到两个回读缓冲。它先注册新版本消费者与覆盖 pass，再注册旧版本消费者与初始写入，编译得到初始写入 → 旧版本回读 → 覆盖 → 新版本回读。最终纹理导出 ShaderRead，两个缓冲导出 HostRead，等待 GPU 完成后分别验证每个版本的全部 4096 像素。两种颜色逐帧交换，覆盖跨帧状态复用。该入口采用逐帧等待。实际场景的 HDR 写入、shader 采样与回读链见 [离屏后处理](POST_PROCESS.md)，其中 pass 以消费者优先的顺序登记，由依赖编译得出执行顺序。异步读回性能另行验证。
+`frame-graph` 每帧将同一张 RGBA8 纹理写入两种颜色，并在每次覆盖前分别复制到两个回读缓冲。它先注册新版本消费者与覆盖 pass，再注册旧版本消费者与初始写入，编译得到初始写入 → 旧版本回读 → 覆盖 → 新版本回读。最终纹理导出 ShaderRead，两个缓冲导出 HostRead，等待 GPU 完成后分别验证每个版本的全部 4096 像素。两种颜色逐帧交换，覆盖跨帧状态复用。随后再写入第三种颜色到另一逻辑纹理；其区间与前者不相交，池必须复用同一物理对象，第三份回读验证该复用。该入口采用逐帧等待。实际场景的 HDR 写入、shader 采样与回读链见 [离屏后处理](POST_PROCESS.md)，其中 pass 以消费者优先的顺序登记，由依赖编译得出执行顺序。异步读回性能另行验证。
 
 2026-11-07 验证记录：Intel Iris Xe / Vulkan 1.3 上，双版本读回连续 32 帧通过；五个内置场景、窗口缩放及 triangle 回归各 8 帧通过，未出现 Vulkan 验证错误或 SYNC-HAZARD。
 

@@ -102,7 +102,7 @@ rover_add_shader(_shader_headers
 static const std::uint32_t triangle_vs_spv[] = { 0x07230203, ... };
 ```
 
-`#include` 该头文件后即可作为 `ShaderDesc::bytecode` 使用。DXIL / MSL / WGSL 输出将在对应后端接入时扩展。当前直接生成 SPIR-V，`-O0` 使构建链无需额外优化插件；编译器来源与依赖见 [Slang 记录](../../vendor/SLANG.md)。
+`#include` 该头文件后即可作为 `ShaderDesc::bytecode` 使用。DXIL / MSL / WGSL 输出将在对应后端接入时扩展。当前直接生成 SPIR-V，`-O0` 使构建链无需额外优化插件；编译器来源与依赖见 [依赖记录](DEPENDENCIES.md#slang-与-vulkan-headers-构建)。
 
 ### 3.3 重编译触发
 

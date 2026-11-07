@@ -63,7 +63,10 @@ namespace rover
                 {
                     return true;
                 }
-                pool.clear();
+                if (!pool.clear())
+                {
+                    return false;
+                }
                 device.destroy_render_pass(present_pass);
                 format       = device.get_swapchain_format();
                 width        = device.get_swapchain_width();

@@ -10,10 +10,10 @@
 | Variant、Callable、文件系统抽象 | 对应 core/platform 测试；同步 F-111/F-208/F-209 状态 | 已有实现，最终复验 |
 | 绑定、push constant、staging、纹理上传 | driver 与模块测试及真实 shader/上传 GPU 使用 | 已有实现，最终复验 |
 | Frame Graph DAG、版本覆盖、自动同步 | 版本排列测试与双版本 GPU 回读 | 已有实现，最终复验 |
-| 瞬态纹理/缓冲、使用区间与资源池 | 非重叠区间复用、在途帧隔离、失败回滚、回收、尺寸变化测试；后处理与相机迁移 | 待完成 |
+| 瞬态纹理/缓冲、使用区间与资源池 | `TRANSIENT_RESOURCES.md`；池/后处理测试；32 帧物理复用与 120 帧在途 GPU 回归 | 已完成，最终矩阵复验 |
 | mip/layer/aspect 子资源跟踪 | 不同范围独立状态、重叠范围依赖、整资源兼容性、实际 GPU 子资源验证 | 待完成 |
-| Vulkan 头文件 vendoring | 固定源码与校验记录，第一方 CMake 移除 find_package(Vulkan)，干净配置构建 | 待完成 |
-| F-605 lint 命令 | CLI、clang-tidy 调用与文件筛选测试，实际调用检查 | 待完成 |
+| Vulkan 头文件 vendoring | manifest 固定 1.4.347；禁用 FindVulkan 且无效 SDK 路径的干净配置通过；Debug 构建及 GPU 回归通过 | 已完成，最终矩阵复验 |
+| F-605 lint 命令 | 5 项 CLI/编译数据库测试；实际 clang-tidy 检查池与 FrameGraph，无编译错误；现有风格警告保留 | 已完成 |
 | 工程验收 | Debug/Release 构建、单元测试、ASan/UBSan、可重复 GPU 回归脚本，记录环境和结果 | 待完成 |
 | 里程碑与需求同步 | 上述证据逐项核验后更新 Roadmap 和 Requirements | 待完成 |
 
@@ -26,3 +26,11 @@
 - framebuffer 与 bind group 由池缓存，清理早于引用的纹理/缓冲和布局。
 - 分配或绑定创建失败，撤销候选资源，已存在的池对象与旧渲染配置保持有效。
 - 设备关闭前等待 GPU，并按绑定、framebuffer、资源、pipeline/layout/render pass 的依赖顺序释放。
+
+## 2026-11-07 中间验收
+
+- Debug：`ctest --test-dir build --output-on-failure` 通过，185 个 C++ 测试与 13 个 Python 测试。
+- GPU：`python3 misc/scripts/phase2_gpu_regression.py --exe bin/debug/rover --output-dir /tmp/rover-phase2-gpu-debug`，12 项全部通过；报告及日志保存在指定目录。
+- 干净配置：`VULKAN_SDK=/tmp/rover-no-sdk cmake -S . -B /tmp/rover-vendored-headers-check -G Ninja -DCMAKE_BUILD_TYPE=Debug -DROVER_TESTS=OFF -DROVER_EDITOR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_Vulkan=TRUE` 通过。编译数据库确认 driver 使用 vendored 头文件，services 未获得 Vulkan include 路径。
+- Release 宿主编译器正在 `build/release` 构建；最终 Release/ASan/UBSan 验收在子资源实现后进行。
+- 尚未验收：mip/layer/aspect 子资源、最终构建矩阵与需求状态同步。Phase 2 保持进行中。

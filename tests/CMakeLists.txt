@@ -40,6 +40,6 @@ set_target_properties(rover_tests PROPERTIES
 add_test(NAME rover_tests COMMAND rover_tests)
 
 find_program(ROVER_TEST_PYTHON NAMES python3 python REQUIRED)
-add_test(NAME rover_shader_tools
+add_test(NAME rover_script_tests
     COMMAND "${ROVER_TEST_PYTHON}" -m unittest discover
             -s "${ROVER_ROOT_DIR}/misc/scripts/tests" -v)

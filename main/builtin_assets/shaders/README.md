@@ -1,6 +1,6 @@
 # 内置 shader
 
-源文件采用 Slang，由仓库内的 `slangc` 编译为 Vulkan 1.3 / SPIR-V 1.6，再嵌入 C++ 头文件。构建规则见 [RoverShader.cmake](../../../misc/cmake/RoverShader.cmake)，编译器来源见 [Slang 记录](../../../vendor/SLANG.md)。
+源文件采用 Slang，由仓库内的 `slangc` 编译为 Vulkan 1.3 / SPIR-V 1.6，再嵌入 C++ 头文件。构建规则见 [RoverShader.cmake](../../../misc/cmake/RoverShader.cmake)，编译器来源见 [依赖记录](../../../docs/standard/DEPENDENCIES.md#slang-与-vulkan-headers-构建)。
 
 | 文件 | 源入口 | 用途 |
 |------|--------|------|

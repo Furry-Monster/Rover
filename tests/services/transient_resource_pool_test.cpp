@@ -184,7 +184,9 @@ TEST_CASE("Transient pool: failure at each resource or dependent allocation roll
         device.fail_at = 0;
         REQUIRE(replacement.prepare_resources(pool));
         REQUIRE(replacement.execute(device));
-        pool.clear();
+        device.serial    = 3;
+        device.completed = 2;
+        REQUIRE(pool.clear());
         CHECK(device.live.empty());
         CHECK_FALSE(replacement.execute(device)); // Pool epoch changed.
     }
@@ -283,4 +285,22 @@ TEST_CASE("Transient pool: host initialization and unused declarations allocate 
     CHECK(pool.texture_count() == 0);
     CHECK(pool.buffer_count() == 1);
     CHECK(graph.resource(camera).buffer != INVALID_HANDLE);
+}
+
+TEST_CASE("Transient pool: clearing refuses to invalidate recorded but unsubmitted commands")
+{
+    MockResourceGraphicsDevice device;
+    TransientResourcePool      pool(device);
+    FrameGraph                 graph;
+    write_texture(graph);
+    REQUIRE(graph.compile());
+    REQUIRE(graph.prepare_resources(pool));
+    REQUIRE(graph.execute(device));
+    const auto live = device.live;
+    CHECK_FALSE(pool.clear());
+    CHECK(device.live == live);
+    device.serial    = 2;
+    device.completed = 1;
+    CHECK(pool.clear());
+    CHECK(device.live.empty());
 }

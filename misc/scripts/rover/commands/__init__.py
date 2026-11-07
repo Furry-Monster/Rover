@@ -23,6 +23,7 @@ from rover.commands import (
     configure,
     debug,
     format,
+    lint,
     run,
     shaders,
     status,
@@ -38,6 +39,7 @@ ALL_COMMANDS = [
     debug,
     test,
     format,
+    lint,
     shaders,
     status,
 ]

@@ -89,7 +89,9 @@
 - ✅ Slang 源码及固定依赖纳入 vendor，本地编译 `slangc`；内置 shader 迁移到 Slang
 - ✅ HDR 离屏场景 → 曝光/Reinhard 映射 → 交换链呈现，支持像素回读和窗口缩放验证，见 [后处理](../dev/POST_PROCESS.md)
 - ✅ Frame Graph 显式资源版本，按 RAW/WAR/WAW 排序同一物理资源的多次写入，双版本 GPU 回读验证，见 [ADR-0016](adr/ADR-0016-frame-graph-resource-versions.md)
-- 🎯 后续渲染：瞬态资源分配与子资源跟踪
+- ✅ Frame Graph 瞬态纹理/缓冲与资源池：按使用区间复用，按 GPU 完成序号隔离在途帧；后处理和相机迁入图，见 [瞬态资源](../dev/TRANSIENT_RESOURCES.md)
+- ✅ Vulkan 头文件源码 vendoring、`rover lint` 与可重复 GPU 回归脚本
+- 🎯 Phase 2 收尾：mip/layer/aspect 子资源跟踪、Release/sanitizer 最终验收，见 [验收清单](../dev/PHASE2_ACCEPTANCE.md)
 - ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
 - ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）

@@ -74,7 +74,7 @@
 |----|-----------|---------|------|---------|
 | **Slang** | v2026.21 | Apache-2.0 WITH LLVM-exception | 构建期 Slang/HLSL → SPIR-V | 源码副本 + `add_subdirectory`，静态宿主编译器 |
 | **SDL3** | vendored | Zlib | 窗口 / 输入 / 计时（platform 层） | 源码副本 + `add_subdirectory` |
-| **Vulkan-Headers** | 系统 SDK（待迁移）¹ | Apache 2.0 | Vulkan API 头文件 | `find_package(Vulkan)` |
+| **Vulkan-Headers** | 1.4.347 / 固定提交 | Apache-2.0 / MIT | Vulkan API 头文件 | 源码副本 + `add_subdirectory` |
 | **volk** | vendored | MIT | Vulkan 函数指针动态加载 | 源码副本 + `add_subdirectory` |
 | **VulkanMemoryAllocator** | vendored | MIT | GPU 内存分配（VMA） | 源码副本 + `add_subdirectory`（header-only） |
 | **EnTT** | vendored | MIT | ECS（用于 modules/scene） | 源码副本 + INTERFACE target（header-only） |
@@ -82,13 +82,21 @@
 | **ImGui** | vendored | MIT | 编辑器 GUI（待 Phase 3） | 源码副本 + 手写 STATIC target |
 | **doctest** | vendored | MIT | 单元测试框架 | 源码副本 + INTERFACE target（header-only） |
 
-¹ 当前 `vendor/CMakeLists.txt` 通过 `find_package(Vulkan REQUIRED)` 获取 Vulkan 头文件。迁移任务：把头文件源码纳入 `vendor/Vulkan-Headers/`，并删除该 `find_package` 调用。
-
-**手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest、slang）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（根目录无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
+**手动 vendor / Git 核对**：`vendor/` 顶层仅包含上表所列库的源码目录（SDL、volk、VulkanMemoryAllocator、spdlog、entt、imgui、doctest、slang、Vulkan-Headers）；不含 `glm/`（线性代数为第一方 [`core/math`](../../core/math/)）。工程根 CMake 仅 `add_subdirectory(vendor)` 接入第三方；不使用 submodule（根目录无 `.gitmodules`）、不在第一方 CMake 中使用 `FetchContent` / `ExternalProject`。各上游库自带的示例 / 测试子目录中的 CMake 脚本不作 Rover 正式构建图的一部分。
 
 详见：[`vendor/CMakeLists.txt`](../../vendor/CMakeLists.txt)。
 
-Slang 的八个必需依赖按上游固定提交放在 `vendor/slang/external/`，保留许可证。版本、提交、归档与 SHA-256 见 [manifest](../../misc/scripts/vendor/manifest.toml)，构建范围与依赖说明见 [Slang 记录](../../vendor/SLANG.md)。Slang 配置内联在 `vendor/CMakeLists.txt`，shader 转译规则位于 `misc/cmake/RoverShader.cmake`。
+Slang 的八个必需依赖按上游固定提交放在 `vendor/slang/external/`，保留许可证。版本、提交、归档与 SHA-256 见 [manifest](../../misc/scripts/vendor/manifest.toml)，构建范围见下文。Slang 配置内联在 `vendor/CMakeLists.txt`，shader 转译规则位于 `misc/cmake/RoverShader.cmake`。
+
+### Slang 与 Vulkan-Headers 构建
+
+Slang v2026.21（`e73d268973dae1a2af701277b27c2fddef98a274`）与 Vulkan-Headers 1.4.347（`387259ecf4b0fe0cfac161b1d0b0a74e42796710`）均以固定源码构建，归档 SHA-256 写入 manifest，许可证保留在各自源码目录。
+
+`vendor/Vulkan-Headers/` 提供全局 CMake target `Vulkan::Headers`。volk 显式链接此 target，并关闭自身 SDK 查找。Linux platform 和 Vulkan driver 将第三方依赖设为 PRIVATE。Slang 检测到已有 target 后复用它；其 `external/vulkan/` 源码副本保留上游依赖快照。
+
+Slang 配置内联在 `vendor/CMakeLists.txt`，构建静态宿主编译器 `slangc`。关闭额外图形运行库、示例、测试、语言服务器、LLVM/DXC/Dawn/Tint 下载及独立调试符号步骤；复用 Rover 输出目录。GNU/Clang 宿主 Debug 对象使用 `-O1 -g0`，引擎保留自己的 Debug 设置。shader 采用直接 SPIR-V 输出和 `-O0`，优化插件在后续加入时同时登记源码依赖。
+
+构建需要 CMake 3.22+、Python 3、C/C++ 工具链及平台开发库。Vulkan SDK 与 glslangValidator 不再是构建依赖；运行时 Vulkan loader/driver 和验证层仍由系统提供。
 
 ### 2.1 计划引入
 
@@ -119,7 +127,7 @@ Vulkan 涉及两类入口，分别处理：
 - **构建期头文件**（`vulkan/vulkan.h` 等）：必须 vendor 进 `vendor/Vulkan-Headers/`，与其他库一视同仁。**禁止** `find_package(Vulkan)`。
 - **运行期加载器**（`libvulkan.so.1` / `vulkan-1.dll`）：由系统驱动栈提供，volk 在运行期动态加载。构建时禁止链接 `Vulkan::Vulkan`，运行期通过 volk 使用系统驱动入口。
 
-头文件迁移状态见当前 vendor 列表的注释。迁移完成后的 `vendor/CMakeLists.txt` 禁止调用 `find_package`。
+头文件迁移已完成，`vendor/CMakeLists.txt` 与 `platform/linux/CMakeLists.txt` 使用仓库内的 target，不再调用 `find_package(Vulkan)`。
 
 ---
 
@@ -325,7 +333,7 @@ target_link_libraries(rover_driver_vulkan PRIVATE Rover::Vulkan)
 - 检查 vendor/ 是否有未提交的本地修改
 - **检查根目录不存在 `.gitmodules`**（强制 ADR-0008：禁用 submodule）
 - **检查仓库内 CMake 文件不出现 `FetchContent_Declare` / `ExternalProject_Add`**（强制 ADR-0008）
-- **检查 `vendor/CMakeLists.txt` 不出现 `find_package` 调用**（Vulkan 迁移完成后；过渡期允许 Vulkan 单点例外）
+- **检查 `vendor/CMakeLists.txt` 不出现 `find_package` 调用**（Vulkan 头文件迁移已完成）
 - **检查每个 `vendor/<lib>/` 目录在 `manifest.toml` 中有对应条目**（强制 ADR-0008 §1.2 step 3）
 - **检查 vendor 源码副本不携带 `.git/`**（强制 ADR-0008 §1.2 step 4）
 

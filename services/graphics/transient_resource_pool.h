@@ -20,7 +20,8 @@ namespace rover
         TransientResourcePool& operator=(const TransientResourcePool&) = delete;
 
         bool prepare(FrameGraph& graph);
-        void clear(); // GPU idle, bindings -> framebuffers -> textures/buffers.
+        // Refuses to invalidate commands recorded in the unsubmitted frame.
+        bool clear(); // GPU idle, bindings -> framebuffers -> textures/buffers.
 
         [[nodiscard]] usize texture_count() const { return textures_.size(); }
 
@@ -28,7 +29,8 @@ namespace rover
 
     private:
         friend class FrameGraph;
-        u64 generation_ = 1;
+        u64 generation_      = 1;
+        u64 recorded_serial_ = 0;
 
         struct Texture
         {

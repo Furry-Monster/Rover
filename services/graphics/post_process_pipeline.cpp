@@ -146,7 +146,12 @@ namespace rover
             return false;
         }
         device_.wait_idle();
-        pool_.clear();
+        if (!pool_.clear())
+        {
+            device_.destroy_pipeline(next_pipeline);
+            device_.destroy_render_pass(next_pass);
+            return false;
+        }
         release(device_, present_pipeline_, &GraphicsDevice::destroy_pipeline);
         release(device_, present_pass_, &GraphicsDevice::destroy_render_pass);
         present_pass_     = next_pass;
@@ -296,7 +301,10 @@ namespace rover
         {
             device_.wait_idle();
         }
-        pool_.clear();
+        if (!pool_.clear())
+        {
+            return;
+        }
         screens_.clear();
         readback_buffer_ = INVALID_HANDLE;
         release(device_, present_pipeline_, &GraphicsDevice::destroy_pipeline);

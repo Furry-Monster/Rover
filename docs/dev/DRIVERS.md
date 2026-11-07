@@ -676,7 +676,7 @@ VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation \
 `vendor/CMakeLists.txt` 中 `Rover::Vulkan` interface target 链接：
 - `volk::volk` — 动态加载与 dispatch
 - `VulkanMemoryAllocator` — VMA header-only 库
-- `Vulkan::Headers` — Vulkan SDK 头文件（来自 `find_package(Vulkan)`）
+- `Vulkan::Headers` — 固定版本源码头文件（来自 `vendor/Vulkan-Headers/`）
 
 平台相关 volk 编译宏（如 Linux 上的 `VK_USE_PLATFORM_XLIB_KHR;VK_USE_PLATFORM_WAYLAND_KHR`）在 vendor/CMakeLists.txt 中按 OS 配置。
 
@@ -694,7 +694,7 @@ rover_add_shader(_shader_headers
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 ```
 
-源入口由 `ENTRY` 选择，SPIR-V 入口保持 `main`。矩阵采用列主序，目标为 Vulkan 1.3 / SPIR-V 1.6。编译器来源见 [Slang 记录](../../vendor/SLANG.md)，完整规则见 [资源规范](../standard/ASSETS.md#3-shader-工作流)。
+源入口由 `ENTRY` 选择，SPIR-V 入口保持 `main`。矩阵采用列主序，目标为 Vulkan 1.3 / SPIR-V 1.6。编译器来源见 [依赖记录](../standard/DEPENDENCIES.md#slang-与-vulkan-headers-构建)，完整规则见 [资源规范](../standard/ASSETS.md#3-shader-工作流)。
 
 `BindingType::SampledTexture` 对应 `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE`，`Sampler` 对应 `VK_DESCRIPTOR_TYPE_SAMPLER`，与 Slang 的 Texture2D / SamplerState 独立绑定一致。离屏颜色写入到 fragment shader 采样的同步由 Frame Graph 资源用途声明生成，见 [后处理](POST_PROCESS.md)。
 

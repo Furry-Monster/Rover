@@ -835,6 +835,10 @@ namespace rover
             ROVER_LOG_ERROR("FrameGraph: prepare resources for the current recording submission before execution");
             return false;
         }
+        if (needs_pool)
+        {
+            prepared_pool_->recorded_serial_ = prepared_serial_;
+        }
         executing_     = true;
         bool succeeded = true;
         for (auto pass_id : execution_order_)

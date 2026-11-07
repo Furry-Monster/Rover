@@ -309,7 +309,7 @@ steps:
   - configure
   - build
   - test                    # rover_tests，必须全绿
-  - lint                    # clang-tidy（计划）
+  - lint                    # clang-tidy 与编译数据库
 ```
 
 PR 必须全平台 + 全配置全绿才能合入。

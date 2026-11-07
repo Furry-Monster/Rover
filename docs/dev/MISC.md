@@ -508,7 +508,7 @@ def validation_env() -> dict[str, str]
 
 将 Slang/HLSL 编译为 Vulkan SPIR-V 1.6，再用 `misc/scripts/spirv_to_header.py` 生成 `static const std::uint32_t <VAR>[]` 头文件。
 
-- `vendor/CMakeLists.txt` 本地构建宿主 target `slangc`，来源见 [vendor/SLANG.md](../../vendor/SLANG.md)。最低 CMake 版本为 3.22。
+- `vendor/CMakeLists.txt` 本地构建宿主 target `slangc`，来源见 [依赖记录](../standard/DEPENDENCIES.md#slang-与-vulkan-headers-构建)。最低 CMake 版本为 3.22。
 - 源位于 `main/builtin_assets/shaders/`，`ENTRY` 选择源入口，输出 SPIR-V 入口统一为 `main`。
 - 指定列主序矩阵、直接 SPIR-V 输出和 `-O0`，当前编译链使用 Slang 自身的代码生成器。
 - `-depfile` 跟踪 import/include；SPIR-V 和头文件均为构建产物。
@@ -541,7 +541,7 @@ def validation_env() -> dict[str, str]
 
 - [ ] **`watch` 子命令**：监视源文件变化，自动 build（基于 `inotify` / `fsevents`，可选依赖）
 - [ ] **`bench` 子命令**：运行 benchmark 套件（待 benchmark 框架到位）
-- [ ] **`lint` 子命令**：clang-tidy 集成（项目根 `.clang-tidy` 已就绪）
+- [x] **`lint` 子命令**：clang-tidy、编译数据库与第一方源筛选；支持检查集合、修复和 warnings-as-errors
 - [ ] **`pkg` 子命令**：打包发布（zip / installer）
 - [ ] **`doc` 子命令**：生成 / 验证 API 文档
 - [ ] **shell 自动补全**：`argcomplete` 或手动 bash/zsh 补全脚本
@@ -552,3 +552,16 @@ def validation_env() -> dict[str, str]
 ---
 
 *Rover Engine Misc Tooling v0.1.0 — 文档版本与脚本同步。*
+
+## clang-tidy 与 Phase 2 GPU 回归
+
+```bash
+# 仓库根目录；构建目录须已有 compile_commands.json。
+./misc/scripts/rover-cli lint --build-dir build --paths services/graphics
+./misc/scripts/rover-cli lint --build-dir build --paths services/graphics/frame_graph.cpp --warnings-as-errors
+python3 misc/scripts/phase2_gpu_regression.py --exe bin/debug/rover --output-dir /tmp/rover-phase2-gpu
+```
+
+lint 默认使用 `build/<config>/` 的数据库，`--build-dir` 可指定手工配置的目录。选择编译数据库中的第一方 C/C++ 翻译单元，去重并排除 vendor 与生成文件；头文件随引用它的翻译单元检查。默认读取 `.clang-tidy`，`--checks` 覆盖检查集合，`--fix` 应用修复，任意 clang-tidy 子进程失败使命令返回非零。需要安装 clang-tidy，工具本身使用 Python 标准库。
+
+GPU 脚本需要显示、Vulkan 设备及 Khronos 验证层，保存每项日志、PPM 和 JSON 报告。脚本启用同步验证与 `VK_INSTANCE_LAYERS`，覆盖五个场景、双版本与物理纹理复用、120 帧在途运行、缩放、曝光和色调映射，并检查退出码、验证错误、读回完成数和资源池上界。Release 也可通过此环境变量显式启用验证。

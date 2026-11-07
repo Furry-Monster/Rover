@@ -129,6 +129,8 @@ TEST_CASE("PostProcessPipeline: graph orders sampling after HDR writes and expor
     CHECK(graph.final_barriers()[0].after == ResourceAccess::HostRead);
     REQUIRE(pipeline.prepare_resources(graph));
     REQUIRE(graph.execute(device));
+    device.serial    = 0;
+    device.completed = 1;
     CHECK(scene_executed);
     CHECK(device.draws == 2);
     bool sampled_hdr = false;
@@ -147,10 +149,13 @@ TEST_CASE("PostProcessPipeline: graph orders sampling after HDR writes and expor
     CHECK_FALSE(pipeline.read_pixels(device.screens[1], pixels));
     graph.reset();
     device.copy_succeeds = false;
+    device.serial        = 2;
     REQUIRE(pipeline.add_passes(graph, device.screens[0], {}, {}));
     REQUIRE(graph.compile());
     REQUIRE(pipeline.prepare_resources(graph));
     REQUIRE(graph.execute(device));
+    device.serial    = 0;
+    device.completed = 2;
     CHECK_FALSE(pipeline.read_pixels(device.screens[0], pixels));
 }
 
