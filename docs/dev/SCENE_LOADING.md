@@ -2,7 +2,7 @@
 
 mesh demo 从 JSON `.rscene` 文件加载并渲染 World。文件不存在时生成默认相机、平行光、立方体并保存；文件已存在时直接加载，保留用户修改。
 
-仓库还提供几何体展台、父子层级、深度遮挡、正交建筑、棋盘庭院五个场景，运行方式见 [main/builtin_assets/scenes/demos/README.md](../../main/builtin_assets/scenes/demos/README.md)。
+默认立方体与几何体展台、父子层级、深度遮挡、正交建筑、棋盘庭院共六个场景统一存放在 `main/builtin_assets/scenes/demos/`，运行方式见 [示例说明](../../main/builtin_assets/scenes/demos/README.md)。
 
 ## 运行
 
@@ -21,7 +21,7 @@ cmake --build build -j 4
 ./bin/debug/rover --scene /tmp/rover-demo.rscene --frames 5
 ```
 
-未传 `--scene` 时使用当前工作目录的 `demo.rscene`。`--demo triangle` 保留原始三角形演示；`--frames` 用于所有 demo。`--demo frame-graph` 验证离屏渲染与 GPU 像素回读，默认运行 8 帧，见 [Frame Graph](FRAME_GRAPH.md)。场景所在父目录须已存在。无效场景会报错退出，保留原文件。
+未传 `--scene` 时加载 `main/builtin_assets/scenes/demos/cube.rscene`，在仓库根目录运行。`--demo triangle` 保留原始三角形演示；`--frames` 用于所有 demo。`--demo frame-graph` 验证离屏渲染与 GPU 像素回读，默认运行 8 帧，见 [Frame Graph](FRAME_GRAPH.md)。场景所在父目录须已存在。无效场景会报错退出，保留原文件。
 
 ## 场景格式与网格资源
 

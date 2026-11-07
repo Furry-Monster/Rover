@@ -301,7 +301,7 @@ namespace rover
     static int rover_main(int argc, char** argv)
     {
         std::string_view demo_name   = "mesh";
-        std::string      scene_path  = "demo.rscene";
+        std::string      scene_path  = "main/builtin_assets/scenes/demos/cube.rscene";
         u32              frame_limit = 0;
         MeshDemoOptions  options;
         for (int i = 1; i < argc; ++i)
@@ -312,7 +312,8 @@ namespace rover
                 std::puts("Usage: rover [--demo mesh|triangle|frame-graph|subresources] [--scene path] [--frames "
                           "positive-count]\n"
                           "Mesh demo creates the scene only when missing, then loads it for rendering.\n"
-                          "Default scene: demo.rscene. --frames applies to all demos.\n"
+                          "Default scene: main/builtin_assets/scenes/demos/cube.rscene.\n"
+                          "--frames applies to all demos.\n"
                           "frame-graph verifies offscreen GPU readback (default: 8 frames).\n"
                           "subresources verifies mip/layer views and depth/stencil readback.\n"
                           "Mesh: --exposure positive-value --tone-map reinhard|none\n"

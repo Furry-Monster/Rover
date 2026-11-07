@@ -16,7 +16,7 @@
 
 加载成功后替换目标 World，失败保留原 World。支持 version 1 的组件数据，但忽略其旧 GPU 句柄；旧场景的网格需要补充 `mesh_asset` 后才能恢复。JSON 与二进制使用相同的场景语义，JSON 加载器在组件边界恢复向量和四元数。
 
-mesh demo 使用 `--scene <path>` 指定持久场景（默认 `demo.rscene`）。仅在文件不存在时生成默认场景，然后从文件加载实际渲染的 World。`--frames <positive-count>` 用于有限帧运行验证。
+mesh demo 使用 `--scene <path>` 指定持久场景，默认加载 `main/builtin_assets/scenes/demos/cube.rscene`。仅在文件不存在时生成默认场景，然后从文件加载实际渲染的 World。`--frames <positive-count>` 用于有限帧运行验证。
 
 ## Consequences
 

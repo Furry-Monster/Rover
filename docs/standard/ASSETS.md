@@ -47,7 +47,7 @@
 
 [`main/builtin_assets/`](../../main/builtin_assets/README.md) 是引擎内置资源的统一存放位置，按资源类型组织。场景放在 `scenes/` 下，示例场景集中于 `scenes/demos/`；后续模型、纹理、材质、字体、音频分别放入 `models/`、`textures/`、`materials/`、`fonts/`、`audio/`，在加入对应资源时创建目录。
 
-当前五个 Phase 2 示例场景通过 `--scene main/builtin_assets/scenes/demos/<name>.rscene` 加载，见 [运行说明](../../main/builtin_assets/scenes/demos/README.md)。
+当前六个 Phase 2 示例场景通过 `--scene main/builtin_assets/scenes/demos/<name>.rscene` 加载，见 [运行说明](../../main/builtin_assets/scenes/demos/README.md)。
 
 当前参与编译的 shader 源文件位于 `main/builtin_assets/shaders/`，其编译流程见下文。
 

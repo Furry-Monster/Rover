@@ -11,6 +11,7 @@ main/builtin_assets/
 └── scenes/
     └── demos/
         ├── README.md
+        ├── cube.rscene
         ├── primitives.rscene
         ├── hierarchy.rscene
         ├── depth.rscene
@@ -26,4 +27,4 @@ main/builtin_assets/
 ./bin/debug/rover --scene main/builtin_assets/scenes/demos/primitives.rscene
 ```
 
-五个示例的内容及完整运行命令见 [示例场景说明](scenes/demos/README.md)。内置 shader 见 [shader 说明](shaders/README.md)，编译流程见 [资源规范](../../docs/standard/ASSETS.md)。
+默认启动加载 `scenes/demos/cube.rscene`。六个示例的内容及完整运行命令见 [示例场景说明](scenes/demos/README.md)。内置 shader 见 [shader 说明](shaders/README.md)，编译流程见 [资源规范](../../docs/standard/ASSETS.md)。

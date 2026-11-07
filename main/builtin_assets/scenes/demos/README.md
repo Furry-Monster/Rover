@@ -1,6 +1,6 @@
 # Rover Phase 2 示例场景
 
-本目录存放五个 Phase 2 示例场景。引擎资源的目录约定见 [builtin_assets/README.md](../../README.md)。
+本目录存放六个 Phase 2 示例场景，包含默认立方体。引擎资源的目录约定见 [builtin_assets/README.md](../../README.md)。
 
 在仓库根目录构建后，通过 `--scene` 加载：
 
@@ -11,6 +11,7 @@ cmake --build build -j 4
 
 | 场景 | 内容 | 运行参数 |
 |------|------|----------|
+| [默认立方体](cube.rscene) | 立方体、透视相机与平行光 | 默认加载，或 `--scene main/builtin_assets/scenes/demos/cube.rscene` |
 | [几何体展台](primitives.rscene) | 立方体、球体、倾斜 quad 与展台，冷色平行光 | `--scene main/builtin_assets/scenes/demos/primitives.rscene` |
 | [父子层级](hierarchy.rscene) | 旋转总装、四条支臂、二级卫星与缩小的独立组件 | `--scene main/builtin_assets/scenes/demos/hierarchy.rscene` |
 | [深度遮挡](depth.rscene) | 前后交错的立方体、球体、薄板与背景，验证深度遮挡 | `--scene main/builtin_assets/scenes/demos/depth.rscene` |
@@ -26,7 +27,7 @@ cmake --build build -j 4
 ./bin/debug/rover --scene main/builtin_assets/scenes/demos/courtyard.rscene
 ```
 
-这些是静态场景，使用现有的无纹理着色和单平行光；无需下载外部资产。关闭窗口退出，附加 `--frames 5` 可有限帧运行。已有的 `--demo triangle` 与默认立方体 demo 仍可使用。
+这些是静态场景，使用现有的无纹理着色和单平行光；无需下载外部资产。关闭窗口退出，附加 `--frames 5` 可有限帧运行。不传 `--scene` 时加载本目录的 `cube.rscene`；`--demo triangle` 使用三角形演示。
 
 场景加载不会改写文件。可复制一份修改后重新运行：
 
