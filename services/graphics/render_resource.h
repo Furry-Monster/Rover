@@ -18,7 +18,7 @@ namespace rover
     // (imported resources) or transiently during compile (managed resources). For
     // Phase 2 we only support imported resources -- the caller pre-creates the
     // GPU resource via `GraphicsDevice` and hands the handle to the frame graph.
-    // Transient allocation will be added in Phase 3.
+    // Explicit versions borrow the imported handles; allocation is separate.
     // ---------------------------------------------------------------------------
 
     enum class ResourceKind : u8
@@ -30,14 +30,22 @@ namespace rover
     enum class ResourceLifetime : u8
     {
         Imported,  // Owned by the caller, reused frame to frame (e.g. swapchain).
-        Transient, // Allocated by the frame graph for one frame (Phase 3+).
+        Transient, // Reserved for graph-managed allocation.
     };
+
+    using RenderResourceId                         = u32;
+    constexpr RenderResourceId INVALID_RESOURCE_ID = 0xFFFFFFFFu;
 
     struct RenderResource
     {
         std::string      name;
         ResourceKind     kind     = ResourceKind::Texture;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
+
+        // Logical versions share their imported root's GPU handles. A version
+        // orders an overwrite; it does not allocate a copy of the old contents.
+        RenderResourceId physical_resource = INVALID_RESOURCE_ID;
+        RenderResourceId previous_version  = INVALID_RESOURCE_ID;
 
         // Undefined leaves the last graph access unchanged; other values request
         // an export transition after all passes finish recording successfully.
@@ -55,9 +63,6 @@ namespace rover
         u32    height = 0;
         Format format = Format::UNDEFINED;
     };
-
-    using RenderResourceId                         = u32;
-    constexpr RenderResourceId INVALID_RESOURCE_ID = 0xFFFFFFFFu;
 
     struct RenderResourceBarrier
     {

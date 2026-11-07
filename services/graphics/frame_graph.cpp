@@ -104,14 +104,15 @@ namespace rover
             return INVALID_RESOURCE_ID;
         }
         RenderResource res{};
-        res.name        = std::move(name);
-        res.kind        = ResourceKind::Texture;
-        res.lifetime    = ResourceLifetime::Imported;
-        res.texture     = handle;
-        res.framebuffer = fb;
-        res.width       = width;
-        res.height      = height;
-        res.format      = format;
+        res.name              = std::move(name);
+        res.kind              = ResourceKind::Texture;
+        res.lifetime          = ResourceLifetime::Imported;
+        res.texture           = handle;
+        res.framebuffer       = fb;
+        res.width             = width;
+        res.height            = height;
+        res.format            = format;
+        res.physical_resource = static_cast<RenderResourceId>(resources_.size());
         resources_.push_back(std::move(res));
         return static_cast<RenderResourceId>(resources_.size() - 1);
     }
@@ -123,12 +124,35 @@ namespace rover
             return INVALID_RESOURCE_ID;
         }
         RenderResource res{};
-        res.name     = std::move(name);
-        res.kind     = ResourceKind::Buffer;
-        res.lifetime = ResourceLifetime::Imported;
-        res.buffer   = handle;
+        res.name              = std::move(name);
+        res.kind              = ResourceKind::Buffer;
+        res.lifetime          = ResourceLifetime::Imported;
+        res.buffer            = handle;
+        res.physical_resource = static_cast<RenderResourceId>(resources_.size());
         resources_.push_back(std::move(res));
         return static_cast<RenderResourceId>(resources_.size() - 1);
+    }
+
+    RenderResourceId FrameGraph::create_version(RenderResourceId previous, std::string name)
+    {
+        if (!prepare_mutation())
+        {
+            return INVALID_RESOURCE_ID;
+        }
+        if (previous >= resources_.size())
+        {
+            ROVER_LOG_ERROR("FrameGraph: version declaration for invalid resource {}", previous);
+            declaration_error_ = true;
+            return INVALID_RESOURCE_ID;
+        }
+        auto       version = resources_[previous];
+        const auto id      = static_cast<RenderResourceId>(resources_.size());
+        version.name =
+            name.empty() ? resources_[version.physical_resource].name + "#" + std::to_string(id) : std::move(name);
+        version.previous_version = previous;
+        version.final_access     = ResourceAccess::Undefined;
+        resources_.push_back(std::move(version));
+        return id;
     }
 
     const RenderResource& FrameGraph::resource(RenderResourceId id) const
@@ -210,13 +234,26 @@ namespace rover
             return false;
         }
 
-        // Aliased imports could hide dependencies behind distinct resource IDs.
+        // Only explicit versions may share an imported physical handle.
+        std::vector<RenderResourceId>             successors(resources_.size(), INVALID_RESOURCE_ID);
         std::unordered_map<u64, RenderResourceId> textures;
         std::unordered_map<u64, RenderResourceId> buffers;
         for (RenderResourceId id = 0; id < resources_.size(); ++id)
         {
-            const auto& res    = resources_[id];
-            const auto  handle = res.kind == ResourceKind::Texture ? res.texture : res.buffer;
+            const auto& res = resources_[id];
+            if (res.previous_version != INVALID_RESOURCE_ID)
+            {
+                auto& successor = successors[res.previous_version];
+                if (successor != INVALID_RESOURCE_ID)
+                {
+                    ROVER_LOG_ERROR("FrameGraph: resource '{}' has branching versions",
+                                    resources_[res.previous_version].name);
+                    return false;
+                }
+                successor = id;
+                continue;
+            }
+            const auto handle = res.kind == ResourceKind::Texture ? res.texture : res.buffer;
             if (handle == INVALID_HANDLE)
             {
                 ROVER_LOG_ERROR("FrameGraph: resource '{}' has an invalid imported handle", res.name);
@@ -235,11 +272,6 @@ namespace rover
 
         std::vector<u32> writers(resources_.size(), INVALID_PASS_ID);
         auto             record_write = [&](u32 pass_id, RenderResourceId id) {
-            if (id >= resources_.size())
-            {
-                ROVER_LOG_ERROR("FrameGraph: pass '{}' writes invalid resource {}", passes_[pass_id].name, id);
-                return false;
-            }
             if (writers[id] != INVALID_PASS_ID && writers[id] != pass_id)
             {
                 ROVER_LOG_ERROR("FrameGraph: resource '{}' has multiple writers: '{}' and '{}'",
@@ -252,13 +284,38 @@ namespace rover
             return true;
         };
 
+        std::vector<std::vector<u32>> readers(resources_.size());
         // Gather every producer first, including those registered after readers.
         for (u32 pass_id = 0; pass_id < passes_.size(); ++pass_id)
         {
-            const auto& pass = passes_[pass_id];
+            const auto&                   pass = passes_[pass_id];
+            std::vector<RenderResourceId> versions(resources_.size(), INVALID_RESOURCE_ID);
+            auto                          record_version = [&](RenderResourceId id) {
+                if (id >= resources_.size())
+                {
+                    ROVER_LOG_ERROR("FrameGraph: pass '{}' uses invalid resource {}", pass.name, id);
+                    return false;
+                }
+                auto& used = versions[resources_[id].physical_resource];
+                if (used != INVALID_RESOURCE_ID && used != id)
+                {
+                    ROVER_LOG_ERROR("FrameGraph: pass '{}' uses multiple versions of one physical resource", pass.name);
+                    return false;
+                }
+                used = id;
+                return true;
+            };
+            for (auto id : pass.reads)
+            {
+                if (!record_version(id))
+                {
+                    return false;
+                }
+                readers[id].push_back(pass_id);
+            }
             for (auto id : pass.writes)
             {
-                if (!record_write(pass_id, id))
+                if (!record_version(id) || !record_write(pass_id, id))
                 {
                     return false;
                 }
@@ -273,10 +330,19 @@ namespace rover
                     ROVER_LOG_ERROR("FrameGraph: pass '{}' has an invalid color attachment {}", pass.name, target);
                     return false;
                 }
-                if (!record_write(pass_id, target))
+                if (!record_version(target) || !record_write(pass_id, target))
                 {
                     return false;
                 }
+            }
+        }
+
+        for (RenderResourceId id = 0; id < resources_.size(); ++id)
+        {
+            if (resources_[id].previous_version != INVALID_RESOURCE_ID && writers[id] == INVALID_PASS_ID)
+            {
+                ROVER_LOG_ERROR("FrameGraph: version '{}' has no producer", resources_[id].name);
+                return false;
             }
         }
 
@@ -289,11 +355,6 @@ namespace rover
             auto&       prerequisites = dependencies[pass_id];
             for (auto id : pass.reads)
             {
-                if (id >= resources_.size())
-                {
-                    ROVER_LOG_ERROR("FrameGraph: pass '{}' reads invalid resource {}", pass.name, id);
-                    return false;
-                }
                 const auto writer = writers[id];
                 if (writer == pass_id)
                 {
@@ -307,6 +368,26 @@ namespace rover
                     prerequisites.push_back(writer);
                 }
             }
+        }
+        // Preserve every previous-version reader before the physical overwrite,
+        // even when the successor's producer was registered first.
+        for (RenderResourceId id = 0; id < resources_.size(); ++id)
+        {
+            const auto previous = resources_[id].previous_version;
+            if (previous == INVALID_RESOURCE_ID)
+            {
+                continue;
+            }
+            auto& prerequisites = dependencies[writers[id]];
+            if (writers[previous] != INVALID_PASS_ID)
+            {
+                prerequisites.push_back(writers[previous]);
+            }
+            prerequisites.insert(prerequisites.end(), readers[previous].begin(), readers[previous].end());
+        }
+        for (u32 pass_id = 0; pass_id < passes_.size(); ++pass_id)
+        {
+            auto& prerequisites = dependencies[pass_id];
             std::sort(prerequisites.begin(), prerequisites.end());
             prerequisites.erase(std::unique(prerequisites.begin(), prerequisites.end()), prerequisites.end());
             indegrees[pass_id] = prerequisites.size();
@@ -356,8 +437,9 @@ namespace rover
         std::vector<ResourceAccess>                     states(resources_.size(), ResourceAccess::Undefined);
         for (auto pass_id : order)
         {
-            const auto&                 pass = passes_[pass_id];
-            std::vector<ResourceAccess> uses(resources_.size(), ResourceAccess::Undefined);
+            const auto&                   pass = passes_[pass_id];
+            std::vector<ResourceAccess>   uses(resources_.size(), ResourceAccess::Undefined);
+            std::vector<RenderResourceId> versions(resources_.size(), INVALID_RESOURCE_ID);
             for (const auto& use : pass.accesses)
             {
                 // Resource IDs were checked when building the dependency graph.
@@ -379,17 +461,21 @@ namespace rover
                                     res.name);
                     return false;
                 }
-                if (uses[use.resource] != ResourceAccess::Undefined && uses[use.resource] != access)
+                const auto physical = res.physical_resource;
+                if (uses[physical] != ResourceAccess::Undefined && uses[physical] != access)
                 {
                     ROVER_LOG_ERROR(
                         "FrameGraph: pass '{}' uses resource '{}' with conflicting usages", pass.name, res.name);
                     return false;
                 }
-                uses[use.resource] = access;
+                uses[physical]     = access;
+                versions[physical] = use.resource;
             }
             if (pass.has_clear)
             {
-                auto& access = uses[pass.color_attachment];
+                const auto physical = resources_[pass.color_attachment].physical_resource;
+                auto&      access   = uses[physical];
+                versions[physical]  = pass.color_attachment;
                 if (access != ResourceAccess::Undefined && access != ResourceAccess::ColorAttachment)
                 {
                     ROVER_LOG_ERROR("FrameGraph: pass '{}' declares a non-color use for its color attachment",
@@ -407,7 +493,7 @@ namespace rover
                 }
                 if (states[id] != access || resource_access_is_write(states[id]) || resource_access_is_write(access))
                 {
-                    barriers[pass_id].push_back({id, states[id], access});
+                    barriers[pass_id].push_back({versions[id], states[id], access});
                 }
                 states[id] = access;
             }
@@ -420,15 +506,21 @@ namespace rover
             {
                 continue;
             }
+            if (successors[id] != INVALID_RESOURCE_ID)
+            {
+                ROVER_LOG_ERROR("FrameGraph: only the last version can export resource '{}'", res.name);
+                return false;
+            }
             const bool valid = supports_access(res, access);
             if (!valid)
             {
                 ROVER_LOG_ERROR("FrameGraph: incompatible final access for resource '{}'", res.name);
                 return false;
             }
-            if (states[id] != access || resource_access_is_write(states[id]) || resource_access_is_write(access))
+            const auto state = states[res.physical_resource];
+            if (state != access || resource_access_is_write(state) || resource_access_is_write(access))
             {
-                final_barriers.push_back({id, states[id], access});
+                final_barriers.push_back({id, state, access});
             }
         }
         dependencies_    = std::move(dependencies);

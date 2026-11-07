@@ -27,9 +27,9 @@ namespace rover
     public:
         PassBuilder(FrameGraph& graph, u32 pass_index);
 
-        // Read the graph writer's output, or external contents if no writer.
+        // Read this version's writer output, or external imported contents.
         void read(RenderResourceId id, ResourceAccess access = ResourceAccess::ShaderRead);
-        // A resource may be written by only one pass; feedback is unsupported.
+        // A version may be written by only one pass; feedback is unsupported.
         void write(RenderResourceId id, ResourceAccess access = ResourceAccess::Automatic);
 
         [[nodiscard]] FrameGraph& graph() const { return graph_; }

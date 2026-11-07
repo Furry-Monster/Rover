@@ -4,7 +4,7 @@
 - **Date**: 2026-11-05
 - **Deciders**: core team
 
-**后续决策**：2026-11-07 的 [ADR-0014](ADR-0014-resource-barriers.md) 在本文的单生产者和依赖排序契约上增加资源用途、自动 barrier 与导出同步。下文记录 2026-11-05 的编译方案。
+**后续决策**：2026-11-07 的 [ADR-0014](ADR-0014-resource-barriers.md) 在本文的单生产者和依赖排序契约上增加资源用途、自动 barrier 与导出同步。[ADR-0016](ADR-0016-frame-graph-resource-versions.md) 随后引入显式版本与物理覆盖依赖，每个逻辑版本保持单生产者。下文记录 2026-11-05 的编译方案。
 
 ## Context
 

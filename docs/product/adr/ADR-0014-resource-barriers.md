@@ -4,6 +4,8 @@
 - **Date**: 2026-11-07
 - **Deciders**: core team
 
+**后续决策**：2026-11-07 的 [ADR-0016](ADR-0016-frame-graph-resource-versions.md) 引入显式版本链，依赖区分逻辑版本，barrier 继续按物理资源累计。
+
 ## Context
 
 ADR-0013 完成 CPU 依赖排序，但读写声明没有用途信息，无法推导 GPU 访问范围与图像布局。Vulkan render pass 原先把所有颜色附件转为呈现布局，离屏渲染无法正确衔接采样或复制。资源还会跨帧复用，仅记录图内状态无法处理首用与重用。

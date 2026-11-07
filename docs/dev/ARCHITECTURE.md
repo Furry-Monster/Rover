@@ -545,7 +545,7 @@ Editor 位于 Layer 5，依赖 services 与 modules，以驱动编辑器功能�
 - [x] **core/object/**：ClassDB 增强 (`register_property` + `PropertyInfo` getter/setter)
 - [x] **core/graphics/**：BindGroupLayout / BindGroup / PipelineLayout / push constants 抽象
 - [x] **drivers/vulkan/**：descriptor pool、staging buffer 自动上传、`update_texture` 完整实现
-- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源、单生产者依赖 DAG、确定性拓扑排序、用途声明与跨 pass 自动 barrier、导出状态）。每个图资源只允许一个写入 pass；无生产者的导入资源由调用方保证初始内容。驱动持续跟踪实际资源状态，串行记录并在呈现前转换交换链，见 [Frame Graph](FRAME_GRAPH.md)、[ADR-0013](../product/adr/ADR-0013-frame-graph-compilation.md) 与 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。
+- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源、单生产者依赖 DAG、确定性拓扑排序、用途声明与跨 pass 自动 barrier、导出状态）。每个逻辑版本只允许一个写入 pass；同一物理资源通过显式版本链依次覆盖，并由 RAW/WAR/WAW 依赖保证旧版本读取先完成，见 [ADR-0016](../product/adr/ADR-0016-frame-graph-resource-versions.md)。无生产者的导入版本由调用方保证初始内容。驱动持续跟踪实际资源状态，串行记录并在呈现前转换交换链，见 [Frame Graph](FRAME_GRAPH.md)、[ADR-0013](../product/adr/ADR-0013-frame-graph-compilation.md) 与 [ADR-0014](../product/adr/ADR-0014-resource-barriers.md)。
 - [x] **modules/scene/**：EnTT 4 `World` 包装、Entity handle、内置 components（Transform/Mesh/Camera/Light/Name/Hierarchy）+ SceneTree 父子链
 - [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
 - [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）

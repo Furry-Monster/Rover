@@ -16,7 +16,7 @@ namespace rover
     // passes. Current compilation contract:
     //
     //   - Resources are imported (no transient allocation).
-    //   - Each resource has at most one writer; reads depend on that writer.
+    //   - Each version has at most one writer; physical overwrite chains add WAR/WAW.
     //   - Independent ready passes use registration order as a tie breaker.
     //   - Resource usages compile into barriers; drivers track physical state.
     // Graph authoring/execution is single-threaded; execution forbids mutation.
@@ -44,9 +44,14 @@ namespace rover
         // Imports an existing GPU buffer into the graph.
         RenderResourceId import_buffer(std::string name, BufferHandle handle);
 
+        // Creates the next logical version of the same physical resource.
+        // Chains are linear; old readers finish before the successor's writer.
+        // Each successor needs a writer, and one pass uses only one version.
+        RenderResourceId create_version(RenderResourceId previous, std::string name = {});
+
         [[nodiscard]] const RenderResource& resource(RenderResourceId id) const;
 
-        // Export a resource for a subsequent GPU use or CPU readback. HostRead
+        // Export the last version for a subsequent GPU use or CPU readback. HostRead
         // additionally requires GPU completion before mapping on the CPU.
         void set_final_access(RenderResourceId id, ResourceAccess access);
 
@@ -65,7 +70,7 @@ namespace rover
 
         // ---- Compile / execute ----
 
-        // Validates references, single-writer access and acyclicity, then builds
+        // Validates references, version chains and acyclicity, then builds
         // a deterministic topological execution plan. Failure clears the plan.
         // Any subsequent graph mutation requires compilation again.
         bool compile();

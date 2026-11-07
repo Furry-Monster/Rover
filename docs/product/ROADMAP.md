@@ -88,7 +88,8 @@
 - ✅ Frame Graph 单队列跨 pass 自动 barrier、资源用途与导出状态、Vulkan 持续布局跟踪；`--demo frame-graph` 验证离屏清屏/复制/HostRead 像素回读，见 [ADR-0014](adr/ADR-0014-resource-barriers.md)
 - ✅ Slang 源码及固定依赖纳入 vendor，本地编译 `slangc`；内置 shader 迁移到 Slang
 - ✅ HDR 离屏场景 → 曝光/Reinhard 映射 → 交换链呈现，支持像素回读和窗口缩放验证，见 [后处理](../dev/POST_PROCESS.md)
-- 🎯 后续渲染：多写入资源版本、瞬态资源与子资源跟踪
+- ✅ Frame Graph 显式资源版本，按 RAW/WAR/WAW 排序同一物理资源的多次写入，双版本 GPU 回读验证，见 [ADR-0016](adr/ADR-0016-frame-graph-resource-versions.md)
+- 🎯 后续渲染：瞬态资源分配与子资源跟踪
 - ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
 - ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）
