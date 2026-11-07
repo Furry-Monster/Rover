@@ -13,14 +13,13 @@ namespace rover
 
     // ---------------------------------------------------------------------------
     // FrameGraph: declarative render graph for organizing one frame's worth of
-    // passes. Phase 2 implementation is intentionally minimal:
+    // passes. Current compilation contract:
     //
     //   - Resources are imported (no transient allocation).
-    //   - Passes execute in declaration order (no automatic reordering).
-    //   - Barriers are handled per-pass via render-pass load/store ops.
-    //
-    // The shape of the API matches future extension: adding a topological sort
-    // + barrier insertion later won't change the user-facing API.
+    //   - Each resource has at most one writer; reads depend on that writer.
+    //   - Independent ready passes use registration order as a tie breaker.
+    //   - No automatic GPU barriers or layout transitions are generated.
+    // Graph authoring/execution is single-threaded; execution forbids mutation.
     // ---------------------------------------------------------------------------
     class FrameGraph
     {
@@ -46,7 +45,6 @@ namespace rover
         RenderResourceId import_buffer(std::string name, BufferHandle handle);
 
         [[nodiscard]] const RenderResource& resource(RenderResourceId id) const;
-        [[nodiscard]] RenderResource&       resource(RenderResourceId id);
 
         // ---- Pass registration ----
 
@@ -54,8 +52,8 @@ namespace rover
         // `execute` is called later from `execute()`.
         u32 add_pass(std::string name, PassSetupFn setup, PassExecuteFn execute);
 
-        // Convenience: marks the pass's color attachment + clear value. Must be
-        // called from inside `setup` or before `execute()`.
+        // Declares an implicit write and sets the color attachment/clear value.
+        // The target must be a texture with a framebuffer. Call before compile().
         void set_color_attachment(u32               pass_index,
                                   RenderResourceId  target,
                                   const ClearValue& clear,
@@ -63,9 +61,9 @@ namespace rover
 
         // ---- Compile / execute ----
 
-        // Compile validates the declared graph (Phase 2: ensures every pass'
-        // declared writes are valid resource ids). Returns false on validation
-        // failure.
+        // Validates references, single-writer access and acyclicity, then builds
+        // a deterministic topological execution plan. Failure clears the plan.
+        // Any subsequent graph mutation requires compilation again.
         bool compile();
 
         // Records all passes onto the device. Each pass gets its own command
@@ -82,10 +80,25 @@ namespace rover
 
         [[nodiscard]] const std::vector<RenderPassNode>& passes() const { return passes_; }
 
+        [[nodiscard]] const std::vector<u32>& execution_order() const { return execution_order_; }
+
+        // Prerequisite pass IDs indexed by registration ID; empty without a plan.
+        [[nodiscard]] const std::vector<std::vector<u32>>& dependencies() const { return dependencies_; }
+
     private:
-        std::vector<RenderResource> resources_;
-        std::vector<RenderPassNode> passes_;
-        bool                        compiled_ = false;
+        friend class PassBuilder;
+
+        bool prepare_mutation();
+        void invalidate();
+        void declare_access(u32 pass_index, RenderResourceId id, bool write);
+
+        std::vector<RenderResource>   resources_;
+        std::vector<RenderPassNode>   passes_;
+        std::vector<u32>              execution_order_;
+        std::vector<std::vector<u32>> dependencies_;
+        bool                          compiled_          = false;
+        bool                          executing_         = false;
+        bool                          declaration_error_ = false;
     };
 
 } // namespace rover

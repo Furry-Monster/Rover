@@ -84,8 +84,8 @@
 **目标**：把渲染从 demo 升级为可持续演进的生产路线，并建立 ECS 场景。
 
 里程碑：
-- ✅ `services/graphics/`：Frame Graph 基础抽象（导入资源、声明顺序执行、render-pass 封装）
-- 🎯 Frame Graph 依赖 DAG 与跨 pass 自动 barrier（当前未实现）
+- ✅ `services/graphics/`：Frame Graph（导入资源、单生产者依赖 DAG、确定性拓扑排序、循环/非法引用检查、render-pass 封装），见 [使用契约](../dev/FRAME_GRAPH.md)
+- 🎯 Frame Graph 跨 pass 自动 barrier（尚未实现，依赖排序不提供 GPU 内存可见性保证）
 - ✅ `modules/scene/`：EnTT World、内置 Entity / Component 与场景层级；通用组件反射继续完善
 - ✅ `modules/serialization/`：二进制 RBIN + JSON 场景格式、进程内 AssetRegistry
 - ✅ `core/os/`：FileAccess / DirAccess + Linux 实现（依照 ADR-0006，替代早期 core/io 命名）

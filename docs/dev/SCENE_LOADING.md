@@ -62,7 +62,7 @@ cmake --build build -j 4
 ctest --test-dir build --output-on-failure
 ```
 
-相关决策：[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)。Phase 2 的依赖 DAG 与跨 pass 自动 barrier 仍在后续范围内。
+相关决策：[ADR-0011](../product/adr/ADR-0011-scene-mesh-resource-paths.md)。Frame Graph 的依赖 DAG 已实现，见 [使用契约](FRAME_GRAPH.md)；跨 pass 自动 barrier 仍在后续范围内。
 
 2026-11-05 本地验证：Debug 构建成功；全量 128 个测试、777 条断言通过；任务队列与 JobSystem 测试连续运行 25 次通过。在 Intel Iris Xe / Vulkan 1.3 上启用现有验证层，首次创建与修改后重载各完成 5 帧；未知资源与损坏 JSON 均按预期退出并保留文件，未记录验证层 error。驱动初始化仍有既有的 `VK_KHR_get_physical_device_properties2` 被列为 device extension 的 warning，另行处理。
 

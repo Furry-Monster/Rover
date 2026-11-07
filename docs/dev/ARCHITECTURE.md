@@ -545,7 +545,7 @@ TEST_CASE("Vector3 dot product") {
 - [x] **core/object/**：ClassDB 增强 (`register_property` + `PropertyInfo` getter/setter)
 - [x] **core/graphics/**：BindGroupLayout / BindGroup / PipelineLayout / push constants 抽象
 - [x] **drivers/vulkan/**：descriptor pool、staging buffer 自动上传、`update_texture` 完整实现
-- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源 + 声明顺序执行 + auto-cmd-list；依赖 DAG 与自动 barrier 尚待实现）
+- [x] **services/graphics/**：`GraphicsService` 单例 + `FrameGraph`（导入资源、单生产者依赖 DAG、确定性拓扑排序、auto-cmd-list；跨 pass 自动 barrier 尚待实现）。每个图资源只允许一个写入 pass，读取依赖该生产者；无生产者的导入资源由调用方保证初始内容。循环、多写入、同 pass 反馈和非法引用在编译时拒绝，图修改使执行计划失效，见 [Frame Graph](FRAME_GRAPH.md) 与 [ADR-0013](../product/adr/ADR-0013-frame-graph-compilation.md)。
 - [x] **modules/scene/**：EnTT 4 `World` 包装、Entity handle、内置 components（Transform/Mesh/Camera/Light/Name/Hierarchy）+ SceneTree 父子链
 - [x] **modules/serialization/**：JSON / 二进制 (`RBIN`) 序列化 + Asset Registry + 场景往返
 - [x] **modules/serialization/**（mesh/texture）：原生 `MeshData` + 立方体/quad/球面生成器 + GPU `MeshUploader` / `TextureUploader`（GLTF / KTX2 vendoring 推迟到 Phase 3）
@@ -558,6 +558,7 @@ TEST_CASE("Vector3 dot product") {
 
 ### 子系统详细文档
 
+- [docs/dev/FRAME_GRAPH.md](FRAME_GRAPH.md) — 资源访问契约、依赖编译与执行边界
 - [docs/dev/CORE.md](CORE.md) — Layer 1 全部子系统的详细 API 与设计
 - [docs/dev/PLATFORM.md](PLATFORM.md) — Linux 平台层与跨平台扩展
 - [docs/dev/DRIVERS.md](DRIVERS.md) — Vulkan 驱动实现细节

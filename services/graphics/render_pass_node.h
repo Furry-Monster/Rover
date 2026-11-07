@@ -13,11 +13,13 @@ namespace rover
     class FrameGraph;
     class GraphicsDevice;
 
+    constexpr u32 INVALID_PASS_ID = 0xFFFFFFFFu;
+
     // ---------------------------------------------------------------------------
     // PassBuilder: callback handle exposed to the user during pass setup.
     //
     // Setup is a pure declaration phase: the user lists which resources the pass
-    // reads / writes (so the graph can derive ordering and barriers) and stores
+    // reads / writes (so the graph can derive ordering) and stores
     // the resulting RenderResourceId values for use during execute.
     // ---------------------------------------------------------------------------
     class PassBuilder
@@ -25,9 +27,9 @@ namespace rover
     public:
         PassBuilder(FrameGraph& graph, u32 pass_index);
 
-        // Declare an existing imported resource as a read input.
+        // Read the graph writer's output, or external contents if no writer.
         void read(RenderResourceId id);
-        // Declare an existing imported resource as a write output.
+        // A resource may be written by only one pass; feedback is unsupported.
         void write(RenderResourceId id);
 
         [[nodiscard]] FrameGraph& graph() const { return graph_; }
@@ -43,7 +45,8 @@ namespace rover
         FrameGraph&     graph;
         GraphicsDevice& device;
         // Command list opened for this pass; the graph is responsible for
-        // begin/end render pass, viewport, scissor, and post-pass barriers.
+        // begin/end render pass when an attachment is set. The callback owns
+        // viewport/scissor setup and synchronization not handled by the driver.
         u64 cmd;
     };
 
@@ -63,12 +66,11 @@ namespace rover
         std::vector<RenderResourceId> reads;
         std::vector<RenderResourceId> writes;
 
-        // The framebuffer + clear values used by execute. Phase 2 only supports
-        // a single framebuffer write target per pass (the first item in `writes`
-        // that has `framebuffer != INVALID_HANDLE`). Set explicitly through
-        // `set_color_attachment(...)` for clarity.
-        FramebufferHandle framebuffer = INVALID_HANDLE;
-        bool              has_clear   = false;
+        // An attachment contributes an implicit write during compilation, separate
+        // from explicit writes so replacing it does not leave a stale dependency.
+        RenderResourceId  color_attachment = INVALID_RESOURCE_ID;
+        FramebufferHandle framebuffer      = INVALID_HANDLE;
+        bool              has_clear        = false;
         /** When true and framebuffer includes depth, pass two clears (color + depth/stencil). */
         bool       clear_depth_stencil = false;
         ClearValue clear{};

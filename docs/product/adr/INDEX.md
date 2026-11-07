@@ -20,6 +20,7 @@
 | [ADR-0010](ADR-0010-graphics-bind-group-design.md) | GraphicsDevice 描述符绑定：WebGPU 风格 BindGroup | Accepted | 2026-04-29 |
 | [ADR-0011](ADR-0011-scene-mesh-resource-paths.md) | 场景持久化稳定网格路径与 GPU 资源恢复 | Accepted | 2026-11-05 |
 | [ADR-0012](ADR-0012-task-queue-synchronization.md) | 互斥保护任务队列所有权与溢出回退 | Accepted | 2026-11-05 |
+| [ADR-0013](ADR-0013-frame-graph-compilation.md) | Frame Graph 单生产者依赖编译与执行计划 | Accepted | 2026-11-05 |
 
 ---
 

@@ -35,7 +35,7 @@ NNN 一旦分配永不重用。同一编号的需求可以演化（更新描述�
 | F-004 | 提供 GraphicsDevice 抽象接口（与具体后端解耦） | Implemented | v0.1 | core/graphics/ |
 | F-005 | 支持顶点 + 索引缓冲渲染 | Implemented | v0.1 | cmd_draw / cmd_draw_indexed |
 | F-006 | 支持 SPIR-V shader 编译时内联 | Implemented | v0.1 | misc/cmake/RoverShader.cmake |
-| F-007 | 实现 Frame Graph 抽象（自动 barrier） | Accepted | v0.2 | services/graphics/ |
+| F-007 | 实现 Frame Graph 抽象（依赖 DAG 已实现，自动 barrier 待实现） | Accepted | v0.2 | services/graphics/ |
 | F-008 | 实现 descriptor set / push constant 抽象 | Accepted | v0.2 | drivers/vulkan/ + 抽象层 |
 | F-009 | 支持 staging buffer 自动上传 | Accepted | v0.2 | update_buffer 对 GpuOnly |
 | F-010 | 实现 update_texture 完整路径（layout transition + copy） | Accepted | v0.2 | drivers/vulkan/ |
