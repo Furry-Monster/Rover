@@ -294,6 +294,8 @@ namespace rover
         current_frame_              = 0;
         current_image_              = 0;
         swapchain_requested_extent_ = {};
+        submitted_serial_ = completed_serial_ = 0;
+        frame_serials_                        = {};
 
         ROVER_LOG_INFO("GraphicsDeviceVulkan shut down");
     }

@@ -81,6 +81,8 @@ namespace rover
         // from explicit writes so replacing it does not leave a stale dependency.
         RenderResourceId  color_attachment = INVALID_RESOURCE_ID;
         FramebufferHandle framebuffer      = INVALID_HANDLE;
+        RenderPassHandle  render_pass      = INVALID_HANDLE;
+        RenderResourceId  depth_attachment = INVALID_RESOURCE_ID;
         bool              has_clear        = false;
         /** When true and framebuffer includes depth, pass two clears (color + depth/stencil). */
         bool       clear_depth_stencil = false;

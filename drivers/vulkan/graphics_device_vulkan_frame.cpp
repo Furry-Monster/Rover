@@ -2,6 +2,7 @@
 #include "drivers/vulkan/graphics_device_vulkan.h"
 #include "drivers/vulkan/vk_format.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace rover
@@ -34,7 +35,8 @@ namespace rover
         }
 
         FrameSync& fs = frame_sync_[current_frame_];
-        VK_CHECK(vkWaitForFences(device_.logical(), 1, &fs.in_flight, VK_TRUE, UINT64_MAX));
+        VK_CHECK_RETURN(vkWaitForFences(device_.logical(), 1, &fs.in_flight, VK_TRUE, UINT64_MAX), false);
+        completed_serial_ = std::max(completed_serial_, frame_serials_[current_frame_]);
 
         // Fence signaled => GPU finished with the command buffers we retired the
         // last time this frame slot was used. Free them now so the pool stays bounded.
@@ -122,7 +124,14 @@ namespace rover
         submit.signalSemaphoreCount = render_finished_sem != VK_NULL_HANDLE ? 1u : 0u;
         submit.pSignalSemaphores    = render_finished_sem != VK_NULL_HANDLE ? &render_finished_sem : nullptr;
 
-        VK_CHECK(vkQueueSubmit(device_.graphics_queue(), 1, &submit, fs.in_flight));
+        if (vkQueueSubmit(device_.graphics_queue(), 1, &submit, fs.in_flight) == VK_SUCCESS)
+        {
+            frame_serials_[current_frame_] = ++submitted_serial_;
+        }
+        else
+        {
+            ROVER_LOG_ERROR("end_frame: graphics submission failed");
+        }
 
         in_frame_ = false;
     }
@@ -155,8 +164,29 @@ namespace rover
     {
         if (device_.logical() != VK_NULL_HANDLE)
         {
-            vkDeviceWaitIdle(device_.logical());
+            if (vkDeviceWaitIdle(device_.logical()) == VK_SUCCESS)
+            {
+                completed_serial_ = submitted_serial_;
+            }
         }
+    }
+
+    u64 GraphicsDeviceVulkan::recording_serial() const
+    {
+        return in_frame_ ? submitted_serial_ + 1 : 0;
+    }
+
+    u64 GraphicsDeviceVulkan::completed_serial()
+    {
+        for (u32 i = 0; i < kMaxFramesInFlight; ++i)
+        {
+            if (frame_serials_[i] > completed_serial_ &&
+                vkGetFenceStatus(device_.logical(), frame_sync_[i].in_flight) == VK_SUCCESS)
+            {
+                completed_serial_ = frame_serials_[i];
+            }
+        }
+        return completed_serial_;
     }
 
     TextureHandle GraphicsDeviceVulkan::get_swapchain_texture()

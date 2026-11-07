@@ -1,6 +1,7 @@
 #include "services/graphics/frame_graph.h"
 
 #include "core/log/log.h"
+#include "services/graphics/transient_resource_pool.h"
 
 #include <algorithm>
 #include <functional>
@@ -15,6 +16,77 @@ namespace rover
     {
         bool supports_access(const RenderResource& resource, ResourceAccess access)
         {
+            if (resource.lifetime == ResourceLifetime::Transient)
+            {
+                if (resource.kind == ResourceKind::Buffer)
+                {
+                    const auto& desc = resource.buffer_desc;
+                    auto        has  = [&](BufferUsage flag) {
+                        return (desc.usage & flag) == flag;
+                    };
+                    switch (access)
+                    {
+                        case ResourceAccess::ShaderRead:
+                        case ResourceAccess::StorageRead:
+                        case ResourceAccess::StorageWrite:
+                            return has(BufferUsage::Storage);
+                        case ResourceAccess::UniformRead:
+                            return has(BufferUsage::Uniform);
+                        case ResourceAccess::VertexRead:
+                            return has(BufferUsage::Vertex);
+                        case ResourceAccess::IndexRead:
+                            return has(BufferUsage::Index);
+                        case ResourceAccess::IndirectRead:
+                            return has(BufferUsage::Indirect);
+                        case ResourceAccess::HostRead:
+                        case ResourceAccess::HostWrite:
+                            return desc.memory != MemoryUsage::GpuOnly;
+                        default:
+                            return resource_access_supports_buffer(access);
+                    }
+                }
+                auto has = [&](TextureUsage flag) {
+                    return (resource.texture_desc.usage & flag) == flag;
+                };
+                switch (access)
+                {
+                    case ResourceAccess::ShaderRead:
+                        if (!has(TextureUsage::Sampled))
+                        {
+                            return false;
+                        }
+                        break;
+                    case ResourceAccess::StorageRead:
+                    case ResourceAccess::StorageWrite:
+                        if (!has(TextureUsage::Storage))
+                        {
+                            return false;
+                        }
+                        break;
+                    case ResourceAccess::ColorAttachment:
+                        if (!has(TextureUsage::ColorAttachment))
+                        {
+                            return false;
+                        }
+                        break;
+                    case ResourceAccess::DepthStencilAttachment:
+                        if (!has(TextureUsage::DepthStencilAttachment))
+                        {
+                            return false;
+                        }
+                        break;
+                    case ResourceAccess::TransferRead:
+                        if (!has(TextureUsage::TransferSrc))
+                        {
+                            return false;
+                        }
+                        break;
+                    case ResourceAccess::TransferWrite:
+                        break; // Drivers add transfer-destination usage.
+                    default:
+                        return false;
+                }
+            }
             if (resource.kind == ResourceKind::Buffer)
             {
                 return resource_access_supports_buffer(access);
@@ -47,7 +119,10 @@ namespace rover
 
     void FrameGraph::invalidate()
     {
-        compiled_ = false;
+        compiled_        = false;
+        prepared_serial_ = 0;
+        prepared_device_ = nullptr;
+        prepared_pool_   = nullptr;
         execution_order_.clear();
         dependencies_.clear();
         barriers_.clear();
@@ -133,6 +208,45 @@ namespace rover
         return static_cast<RenderResourceId>(resources_.size() - 1);
     }
 
+    RenderResourceId FrameGraph::create_texture(std::string name, const TextureDesc& desc)
+    {
+        const auto id = import_texture(std::move(name), INVALID_HANDLE, desc.format, desc.width, desc.height);
+        if (id != INVALID_RESOURCE_ID)
+        {
+            resources_[id].lifetime                = ResourceLifetime::Transient;
+            resources_[id].texture_desc            = desc;
+            resources_[id].texture_desc.debug_name = nullptr;
+        }
+        return id;
+    }
+
+    RenderResourceId FrameGraph::create_buffer(std::string name, const BufferDesc& desc)
+    {
+        const auto id = import_buffer(std::move(name), INVALID_HANDLE);
+        if (id != INVALID_RESOURCE_ID)
+        {
+            resources_[id].lifetime               = ResourceLifetime::Transient;
+            resources_[id].buffer_desc            = desc;
+            resources_[id].buffer_desc.debug_name = nullptr;
+        }
+        return id;
+    }
+
+    RenderBindGroupId FrameGraph::create_bind_group(BindGroupLayoutHandle layout, std::vector<RenderBinding> entries)
+    {
+        if (!prepare_mutation())
+        {
+            return INVALID_BIND_GROUP_ID;
+        }
+        bind_groups_.push_back({layout, std::move(entries), INVALID_HANDLE});
+        return static_cast<RenderBindGroupId>(bind_groups_.size() - 1);
+    }
+
+    BindGroupHandle FrameGraph::bind_group(RenderBindGroupId id) const
+    {
+        return id < bind_groups_.size() ? bind_groups_[id].handle : INVALID_HANDLE;
+    }
+
     RenderResourceId FrameGraph::create_version(RenderResourceId previous, std::string name)
     {
         if (!prepare_mutation())
@@ -215,9 +329,34 @@ namespace rover
         auto& pass               = passes_[pass_index];
         pass.color_attachment    = target;
         pass.framebuffer         = target < resources_.size() ? resources_[target].framebuffer : INVALID_HANDLE;
+        pass.render_pass         = INVALID_HANDLE;
+        pass.depth_attachment    = INVALID_RESOURCE_ID;
         pass.has_clear           = true;
         pass.clear_depth_stencil = clear_depth_stencil;
         pass.clear               = clear;
+    }
+
+    void FrameGraph::set_render_target(u32               pass_index,
+                                       RenderPassHandle  render_pass,
+                                       RenderResourceId  color,
+                                       const ClearValue& clear,
+                                       RenderResourceId  depth)
+    {
+        set_color_attachment(pass_index, color, clear, depth != INVALID_RESOURCE_ID);
+        if (!executing_ && pass_index < passes_.size())
+        {
+            passes_[pass_index].render_pass      = render_pass;
+            passes_[pass_index].depth_attachment = depth;
+            if (!render_pass)
+            {
+                declaration_error_ = true;
+            }
+        }
+    }
+
+    bool FrameGraph::prepare_resources(TransientResourcePool& pool)
+    {
+        return pool.prepare(*this);
     }
 
     bool FrameGraph::compile()
@@ -251,6 +390,20 @@ namespace rover
                     return false;
                 }
                 successor = id;
+                continue;
+            }
+            if (res.lifetime == ResourceLifetime::Transient)
+            {
+                const auto& texture = res.texture_desc;
+                if ((res.kind == ResourceKind::Texture &&
+                     (texture.width == 0 || texture.height == 0 || texture.depth == 0 || texture.mip_levels == 0 ||
+                      texture.array_layers == 0 || texture.format == Format::UNDEFINED ||
+                      static_cast<u32>(texture.usage) == 0)) ||
+                    (res.kind == ResourceKind::Buffer && res.buffer_desc.size == 0))
+                {
+                    ROVER_LOG_ERROR("FrameGraph: invalid transient descriptor '{}'", res.name);
+                    return false;
+                }
                 continue;
             }
             const auto handle = res.kind == ResourceKind::Texture ? res.texture : res.buffer;
@@ -325,7 +478,7 @@ namespace rover
                 const auto target = pass.color_attachment;
                 if (target >= resources_.size() || resources_[target].kind != ResourceKind::Texture ||
                     !supports_access(resources_[target], ResourceAccess::ColorAttachment) ||
-                    resources_[target].framebuffer == INVALID_HANDLE)
+                    (resources_[target].framebuffer == INVALID_HANDLE && pass.render_pass == INVALID_HANDLE))
                 {
                     ROVER_LOG_ERROR("FrameGraph: pass '{}' has an invalid color attachment {}", pass.name, target);
                     return false;
@@ -333,6 +486,18 @@ namespace rover
                 if (!record_version(target) || !record_write(pass_id, target))
                 {
                     return false;
+                }
+                if (pass.depth_attachment != INVALID_RESOURCE_ID)
+                {
+                    const auto depth = pass.depth_attachment;
+                    if (!record_version(depth) || resources_[depth].kind != ResourceKind::Texture ||
+                        !supports_access(resources_[depth], ResourceAccess::DepthStencilAttachment) ||
+                        resources_[depth].width != resources_[target].width ||
+                        resources_[depth].height != resources_[target].height || !record_write(pass_id, depth))
+                    {
+                        ROVER_LOG_ERROR("FrameGraph: invalid depth attachment in '{}'", pass.name);
+                        return false;
+                    }
                 }
             }
         }
@@ -342,6 +507,19 @@ namespace rover
             if (resources_[id].previous_version != INVALID_RESOURCE_ID && writers[id] == INVALID_PASS_ID)
             {
                 ROVER_LOG_ERROR("FrameGraph: version '{}' has no producer", resources_[id].name);
+                return false;
+            }
+        }
+
+        for (RenderResourceId id = 0; id < resources_.size(); ++id)
+        {
+            const auto& resource = resources_[id];
+            if (resource.physical_resource == id && resource.lifetime == ResourceLifetime::Transient &&
+                writers[id] == INVALID_PASS_ID &&
+                (!readers[id].empty() || resource_access_is_read(resource.final_access)) &&
+                !(resource.kind == ResourceKind::Buffer && resource.buffer_desc.memory == MemoryUsage::CpuToGpu))
+            {
+                ROVER_LOG_ERROR("FrameGraph: transient '{}' is read without a producer", resource.name);
                 return false;
             }
         }
@@ -483,6 +661,18 @@ namespace rover
                     return false;
                 }
                 access = ResourceAccess::ColorAttachment;
+                if (pass.depth_attachment != INVALID_RESOURCE_ID)
+                {
+                    const auto depth_physical = resources_[pass.depth_attachment].physical_resource;
+                    if (uses[depth_physical] != ResourceAccess::Undefined &&
+                        uses[depth_physical] != ResourceAccess::DepthStencilAttachment)
+                    {
+                        ROVER_LOG_ERROR("FrameGraph: conflicting depth attachment access in '{}'", pass.name);
+                        return false;
+                    }
+                    uses[depth_physical]     = ResourceAccess::DepthStencilAttachment;
+                    versions[depth_physical] = pass.depth_attachment;
+                }
             }
             for (RenderResourceId id = 0; id < uses.size(); ++id)
             {
@@ -523,6 +713,95 @@ namespace rover
                 final_barriers.push_back({id, state, access});
             }
         }
+        for (auto& resource : resources_)
+        {
+            resource.first_use = resource.last_use = INVALID_PASS_ID;
+        }
+        for (u32 position = 0; position < order.size(); ++position)
+        {
+            const auto& pass  = passes_[order[position]];
+            auto        touch = [&](RenderResourceId id) {
+                auto& root     = resources_[resources_[id].physical_resource];
+                root.first_use = std::min(root.first_use, position);
+                root.last_use  = position;
+            };
+            for (const auto& access : pass.accesses)
+            {
+                touch(access.resource);
+            }
+            if (pass.has_clear)
+            {
+                touch(pass.color_attachment);
+            }
+            if (pass.depth_attachment != INVALID_RESOURCE_ID)
+            {
+                touch(pass.depth_attachment);
+            }
+        }
+        for (const auto& resource : resources_)
+        {
+            if (resource.final_access != ResourceAccess::Undefined)
+            {
+                {
+                    auto& root = resources_[resource.physical_resource];
+                    if (root.first_use == INVALID_PASS_ID)
+                    {
+                        root.first_use = static_cast<u32>(order.size());
+                    }
+                    root.last_use = static_cast<u32>(order.size());
+                }
+            }
+        }
+        for (auto& resource : resources_)
+        {
+            const auto& root   = resources_[resource.physical_resource];
+            resource.first_use = root.first_use;
+            resource.last_use  = root.last_use;
+        }
+        for (const auto& group : bind_groups_)
+        {
+            std::vector<u32> slots;
+            if (!group.layout)
+            {
+                ROVER_LOG_ERROR("FrameGraph: invalid bind group layout");
+                return false;
+            }
+            for (const auto& binding : group.entries)
+            {
+                const auto& entry = binding.entry;
+                if (std::find(slots.begin(), slots.end(), entry.binding) != slots.end())
+                {
+                    ROVER_LOG_ERROR("FrameGraph: duplicate binding slot");
+                    return false;
+                }
+                slots.push_back(entry.binding);
+                if (entry.type == BindingType::Sampler)
+                {
+                    if (binding.resource == INVALID_RESOURCE_ID && entry.sampler)
+                    {
+                        continue;
+                    }
+                }
+                else if (binding.resource < resources_.size())
+                {
+                    const auto& resource = resources_[binding.resource];
+                    const bool  buffer =
+                        entry.type == BindingType::UniformBuffer || entry.type == BindingType::StorageBuffer;
+                    if (resource.first_use != INVALID_PASS_ID && buffer == (resource.kind == ResourceKind::Buffer))
+                    {
+                        if (!buffer || resource.lifetime == ResourceLifetime::Imported ||
+                            (entry.buffer_offset < resource.buffer_desc.size &&
+                             (entry.buffer_size == 0 ||
+                              entry.buffer_size <= resource.buffer_desc.size - entry.buffer_offset)))
+                        {
+                            continue;
+                        }
+                    }
+                }
+                ROVER_LOG_ERROR("FrameGraph: invalid or unused bind group resource");
+                return false;
+            }
+        }
         dependencies_    = std::move(dependencies);
         execution_order_ = std::move(order);
         barriers_        = std::move(barriers);
@@ -541,6 +820,19 @@ namespace rover
         if (!compiled_)
         {
             ROVER_LOG_WARN("FrameGraph::execute requires a successful compile() after graph changes");
+            return false;
+        }
+        const bool needs_pool =
+            !bind_groups_.empty() ||
+            std::any_of(resources_.begin(),
+                        resources_.end(),
+                        [](const auto& r) { return r.lifetime == ResourceLifetime::Transient; }) ||
+            std::any_of(passes_.begin(), passes_.end(), [](const auto& p) { return p.render_pass != INVALID_HANDLE; });
+        if (needs_pool &&
+            (prepared_device_ != &device || prepared_serial_ == 0 || prepared_serial_ != device.recording_serial() ||
+             !prepared_pool_ || prepared_epoch_ != prepared_pool_->generation_))
+        {
+            ROVER_LOG_ERROR("FrameGraph: prepare resources for the current recording submission before execution");
             return false;
         }
         executing_     = true;
@@ -644,6 +936,7 @@ namespace rover
         }
         resources_.clear();
         passes_.clear();
+        bind_groups_.clear();
         declaration_error_ = false;
     }
 

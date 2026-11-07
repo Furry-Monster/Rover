@@ -538,6 +538,8 @@ Editor 位于 Layer 5，依赖 services 与 modules，以驱动编辑器功能�
 
 ### Phase 2 (v0.2 — 进行中)
 
+完整收尾与证据见 [Phase 2 验收](PHASE2_ACCEPTANCE.md)。瞬态资源、图内绑定及按提交完成回收遵循 [ADR-0017](../product/adr/ADR-0017-frame-graph-transient-resources.md)。
+
 离屏场景后处理见 [使用与验证](POST_PROCESS.md)，按 [ADR-0015](../product/adr/ADR-0015-offscreen-post-process.md) 实施：Slang 源位于 `main/builtin_assets/shaders/`，`services/graphics/PostProcessPipeline` 管理 HDR 场景、RGBA8 色调映射和交换链呈现目标；main 提供 ECS 绘制回调与逐交换链图像的相机 UBO。
 
 - [x] **core/variant/**：`Variant` (union+tag, 64B inline) + `Callable` 类型擦除调用

@@ -2,6 +2,7 @@
 
 #include "core/graphics/graphics_device.h"
 #include "services/graphics/frame_graph.h"
+#include "services/graphics/transient_resource_pool.h"
 
 #include <vector>
 
@@ -18,7 +19,7 @@ namespace rover
     class PostProcessPipeline
     {
     public:
-        explicit PostProcessPipeline(GraphicsDevice& device) : device_(device) {}
+        explicit PostProcessPipeline(GraphicsDevice& device) : device_(device), pool_(device) {}
 
         ~PostProcessPipeline();
         PostProcessPipeline(const PostProcessPipeline&)            = delete;
@@ -36,7 +37,10 @@ namespace rover
                         PassSetupFn         scene_setup,
                         PassExecuteFn       scene_execute,
                         PostProcessSettings settings = {});
-        // Call after end_frame()/present(); waits for GPU completion before map.
+
+        bool prepare_resources(FrameGraph& graph) { return graph.prepare_resources(pool_); }
+
+        // Call after end_frame()/present(), before authoring the next frame.
         bool read_pixels(TextureHandle screen, std::vector<u8>& pixels);
         void shutdown();
 
@@ -51,50 +55,36 @@ namespace rover
         [[nodiscard]] bool readback_enabled() const { return readback_enabled_; }
 
     private:
-        struct Target
-        {
-            TextureHandle     screen           = INVALID_HANDLE;
-            TextureHandle     hdr              = INVALID_HANDLE;
-            TextureHandle     depth            = INVALID_HANDLE;
-            TextureHandle     ldr              = INVALID_HANDLE;
-            FramebufferHandle scene_fb         = INVALID_HANDLE;
-            FramebufferHandle tone_fb          = INVALID_HANDLE;
-            FramebufferHandle present_fb       = INVALID_HANDLE;
-            BindGroupHandle   tone_bindings    = INVALID_HANDLE;
-            BindGroupHandle   present_bindings = INVALID_HANDLE;
-            BufferHandle      readback         = INVALID_HANDLE;
-        };
+        RenderBindGroupId make_bindings(FrameGraph& graph, RenderResourceId texture);
+        PipelineHandle    make_pipeline(RenderPassHandle pass, ShaderHandle fragment);
+        void              draw_fullscreen(PassExecuteContext& ctx,
+                                          PipelineHandle      pipeline,
+                                          BindGroupHandle     bindings,
+                                          u32                 width,
+                                          u32                 height,
+                                          PostProcessSettings settings);
 
-        Target*         find_target(TextureHandle screen);
-        BindGroupHandle make_bindings(TextureHandle texture);
-        PipelineHandle  make_pipeline(RenderPassHandle pass, ShaderHandle fragment);
-        void            destroy_targets(std::vector<Target>& targets);
-        void            draw_fullscreen(PassExecuteContext& ctx,
-                                        PipelineHandle      pipeline,
-                                        BindGroupHandle     bindings,
-                                        u32                 width,
-                                        u32                 height,
-                                        PostProcessSettings settings);
-
-        GraphicsDevice&       device_;
-        std::vector<Target>   targets_;
-        ShaderHandle          vertex_           = INVALID_HANDLE;
-        ShaderHandle          tone_shader_      = INVALID_HANDLE;
-        ShaderHandle          present_shader_   = INVALID_HANDLE;
-        SamplerHandle         sampler_          = INVALID_HANDLE;
-        BindGroupLayoutHandle bindings_layout_  = INVALID_HANDLE;
-        PipelineLayoutHandle  pipeline_layout_  = INVALID_HANDLE;
-        RenderPassHandle      scene_pass_       = INVALID_HANDLE;
-        RenderPassHandle      tone_pass_        = INVALID_HANDLE;
-        RenderPassHandle      present_pass_     = INVALID_HANDLE;
-        PipelineHandle        tone_pipeline_    = INVALID_HANDLE;
-        PipelineHandle        present_pipeline_ = INVALID_HANDLE;
-        Format                screen_format_    = Format::UNDEFINED;
-        u32                   width_            = 0;
-        u32                   height_           = 0;
-        u64                   generation_       = 0;
-        bool                  initialized_      = false;
-        bool                  readback_enabled_ = false;
-        TextureHandle         copied_screen_    = INVALID_HANDLE;
+        GraphicsDevice&            device_;
+        TransientResourcePool      pool_;
+        std::vector<TextureHandle> screens_;
+        BufferHandle               readback_buffer_  = INVALID_HANDLE;
+        ShaderHandle               vertex_           = INVALID_HANDLE;
+        ShaderHandle               tone_shader_      = INVALID_HANDLE;
+        ShaderHandle               present_shader_   = INVALID_HANDLE;
+        SamplerHandle              sampler_          = INVALID_HANDLE;
+        BindGroupLayoutHandle      bindings_layout_  = INVALID_HANDLE;
+        PipelineLayoutHandle       pipeline_layout_  = INVALID_HANDLE;
+        RenderPassHandle           scene_pass_       = INVALID_HANDLE;
+        RenderPassHandle           tone_pass_        = INVALID_HANDLE;
+        RenderPassHandle           present_pass_     = INVALID_HANDLE;
+        PipelineHandle             tone_pipeline_    = INVALID_HANDLE;
+        PipelineHandle             present_pipeline_ = INVALID_HANDLE;
+        Format                     screen_format_    = Format::UNDEFINED;
+        u32                        width_            = 0;
+        u32                        height_           = 0;
+        u64                        generation_       = 0;
+        bool                       initialized_      = false;
+        bool                       readback_enabled_ = false;
+        TextureHandle              copied_screen_    = INVALID_HANDLE;
     };
 } // namespace rover

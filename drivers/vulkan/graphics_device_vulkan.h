@@ -215,6 +215,8 @@ namespace rover
         void end_frame() override;
         void present() override;
         void wait_idle() override;
+        u64  recording_serial() const override;
+        u64  completed_serial() override;
 
         TextureHandle get_swapchain_texture() override;
         u32           get_swapchain_image_count() override;
@@ -268,9 +270,12 @@ namespace rover
         std::vector<CommandListHandle> frame_command_lists_;
         CommandListHandle              active_command_list_ = INVALID_HANDLE;
 
-        bool in_frame_        = false;
-        bool swapchain_dirty_ = false;
-        char api_name_[32]    = "Vulkan 1.3";
+        bool                                in_frame_         = false;
+        bool                                swapchain_dirty_  = false;
+        u64                                 submitted_serial_ = 0;
+        u64                                 completed_serial_ = 0;
+        std::array<u64, kMaxFramesInFlight> frame_serials_{};
+        char                                api_name_[32] = "Vulkan 1.3";
     };
 
 } // namespace rover

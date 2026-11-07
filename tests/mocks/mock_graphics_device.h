@@ -131,6 +131,10 @@ namespace rover
 
         void wait_idle() override {}
 
+        u64 recording_serial() const override { return 1; }
+
+        u64 completed_serial() override { return 0; }
+
         TextureHandle get_swapchain_texture() override { return INVALID_HANDLE; }
 
         u32 get_swapchain_image_count() override { return 0; }

@@ -72,3 +72,12 @@ archive = "https://codeload.github.com/lua/lua/tar.gz/3fe7be956f23385aa1950dc31e
 sha256 = "4776526f89abeea61cce41a056577859180dbb2d4cb6c1dad00955872a1007bb"
 path = "vendor/slang/external/lua"
 parent = "slang"
+
+[packages."vulkan-headers"]
+version = "1.4.347"
+repository = "https://github.com/KhronosGroup/Vulkan-Headers"
+commit = "387259ecf4b0fe0cfac161b1d0b0a74e42796710"
+archive = "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/387259ecf4b0fe0cfac161b1d0b0a74e42796710"
+sha256 = "d90e6eb2ed69efce8cf49793404b09fbdb7066ea2b624f3f3ea3c8dbc5fa52a0"
+path = "vendor/Vulkan-Headers"
+license = "Apache-2.0 AND MIT"

@@ -6,6 +6,7 @@ rover_add_library(rover_driver_vulkan
     SOURCES ${_vulkan_sources}
     PUBLIC_DEPS
         Rover::Core
+    PRIVATE_DEPS
         Rover::Vulkan
     FOLDER "Rover/Drivers"
 )

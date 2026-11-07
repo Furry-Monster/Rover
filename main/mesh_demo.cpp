@@ -75,39 +75,14 @@ namespace rover
             PipelineLayoutHandle  pipeline_layout = INVALID_HANDLE;
             PipelineHandle        pipeline        = INVALID_HANDLE;
 
-            struct CameraBinding
-            {
-                BufferHandle    buffer = INVALID_HANDLE;
-                BindGroupHandle group  = INVALID_HANDLE;
-            };
-
-            std::unordered_map<TextureHandle, CameraBinding> cameras;
-            u64                                              camera_generation = 0;
-
-            void clear_cameras(std::unordered_map<TextureHandle, CameraBinding>& bindings)
-            {
-                for (const auto& [texture, camera] : bindings)
-                {
-                    if (camera.group)
-                    {
-                        device.destroy_bind_group(camera.group);
-                    }
-                    if (camera.buffer)
-                    {
-                        device.destroy_buffer(camera.buffer);
-                    }
-                }
-                bindings.clear();
-            }
-
             ~DemoResources()
             {
                 device.wait_idle();
-                clear_cameras(cameras);
                 if (pipeline)
                 {
                     device.destroy_pipeline(pipeline);
                 }
+                post.shutdown(); // Releases cached camera/image bindings before layouts.
                 if (pipeline_layout)
                 {
                     device.destroy_pipeline_layout(pipeline_layout);
@@ -124,45 +99,6 @@ namespace rover
                 {
                     device.destroy_shader(mesh_vs);
                 }
-                post.shutdown();
-            }
-
-            bool sync_cameras()
-            {
-                if (camera_generation == post.generation())
-                {
-                    return true;
-                }
-                std::unordered_map<TextureHandle, CameraBinding> next;
-                for (u32 i = 0; i < device.get_swapchain_image_count(); ++i)
-                {
-                    auto& camera  = next[device.get_swapchain_texture_at(i)];
-                    camera.buffer = device.create_buffer(
-                        {sizeof(CameraUbo), BufferUsage::Uniform, MemoryUsage::CpuToGpu, "CameraUbo"});
-                    if (!camera.buffer)
-                    {
-                        clear_cameras(next);
-                        return false;
-                    }
-                    BindGroupDesc group{};
-                    group.layout = bgl;
-                    BindGroupEntry entry{};
-                    entry.binding     = 0;
-                    entry.type        = BindingType::UniformBuffer;
-                    entry.buffer      = camera.buffer;
-                    entry.buffer_size = sizeof(CameraUbo);
-                    group.entries     = {entry};
-                    camera.group      = device.create_bind_group(group);
-                    if (!camera.group)
-                    {
-                        clear_cameras(next);
-                        return false;
-                    }
-                }
-                clear_cameras(cameras); // post.prepare() already waited for GPU idle.
-                cameras           = std::move(next);
-                camera_generation = post.generation();
-                return true;
             }
         };
 
@@ -386,17 +322,16 @@ namespace rover
             {
                 continue;
             }
-            if (!demo.post.prepare() || !demo.sync_cameras())
+            if (!demo.post.prepare())
             {
                 device.end_frame();
                 device.present();
                 ROVER_LOG_ERROR("Failed to prepare scene render targets or camera buffers");
                 return 1;
             }
-            const auto  screen = device.get_swapchain_texture();
-            const auto& camera = demo.cameras.at(screen);
-            const u32   width  = demo.post.width();
-            const u32   height = demo.post.height();
+            const auto screen = device.get_swapchain_texture();
+            const u32  width  = demo.post.width();
+            const u32  height = demo.post.height();
             if (initial_width == 0)
             {
                 initial_width  = width;
@@ -417,7 +352,6 @@ namespace rover
                         ubo.view               = SceneTree::world_matrix(world, entity).inverse();
                     }
                 });
-            device.update_buffer(camera.buffer, &ubo, sizeof(ubo));
             Vector3 light_dir{0.0f, -1.0f, 0.0f};
             Vector3 light_color{1.0f, 1.0f, 1.0f};
             f32     light_intensity = 1.0f;
@@ -431,7 +365,14 @@ namespace rover
             });
             auto& graph = service.frame_graph();
             graph.reset();
-            const auto                                         camera_id = graph.import_buffer("camera", camera.buffer);
+            const auto camera_id =
+                graph.create_buffer("camera", {sizeof(CameraUbo), BufferUsage::Uniform, MemoryUsage::CpuToGpu});
+            RenderBinding camera_binding{};
+            camera_binding.entry.binding     = 0;
+            camera_binding.entry.type        = BindingType::UniformBuffer;
+            camera_binding.entry.buffer_size = sizeof(CameraUbo);
+            camera_binding.resource          = camera_id;
+            const auto camera_group          = graph.create_bind_group(demo.bgl, {camera_binding});
             std::unordered_map<BufferHandle, RenderResourceId> mesh_resources;
             const bool                                         added = demo.post.add_passes(
                 graph,
@@ -460,7 +401,7 @@ namespace rover
                     ctx.device.cmd_set_viewport(ctx.cmd,
                                                 {0.0f, 0.0f, static_cast<f32>(width), static_cast<f32>(height)});
                     ctx.device.cmd_set_scissor(ctx.cmd, {0, 0, width, height});
-                    ctx.device.cmd_bind_group(ctx.cmd, 0, camera.group);
+                    ctx.device.cmd_bind_group(ctx.cmd, 0, ctx.graph.bind_group(camera_group));
                     world.each<TransformComponent, MeshComponent>(
                         [&](auto entity, TransformComponent&, MeshComponent& mesh) {
                             if (!mesh.vertex_buffer)
@@ -493,7 +434,12 @@ namespace rover
                         });
                 },
                 {options.exposure, options.tone_mapping});
-            const bool recorded = added && graph.compile() && graph.execute(device);
+            const bool ready = added && graph.compile() && demo.post.prepare_resources(graph);
+            if (ready)
+            {
+                device.update_buffer(graph.resource(camera_id).buffer, &ubo, sizeof(ubo));
+            }
+            const bool recorded = ready && graph.execute(device);
             device.end_frame();
             device.present();
             if (!recorded)

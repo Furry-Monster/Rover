@@ -120,6 +120,11 @@ namespace rover
         virtual void present()     = 0;
         virtual void wait_idle()   = 0;
 
+        // Monotonic submission timeline on the graphics queue. Recording is 0
+        // outside a frame; completion includes all earlier queue submissions.
+        virtual u64 recording_serial() const = 0;
+        virtual u64 completed_serial()       = 0;
+
         // ---- Swapchain ----
 
         // Returns the texture handle for the swapchain image currently bound for

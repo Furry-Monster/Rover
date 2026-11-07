@@ -19,9 +19,8 @@ add_subdirectory("${ROVER_VENDOR_ROOT}/SDL" EXCLUDE_FROM_ALL)
 
 # ---------------------------------------------------------------------------
 
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-find_package(Vulkan REQUIRED)
-message(STATUS "[Rover] Vulkan SDK: ${Vulkan_INCLUDE_DIRS}")
+# Vulkan API headers are built from the pinned source copy.
+add_subdirectory("${ROVER_VENDOR_ROOT}/Vulkan-Headers" EXCLUDE_FROM_ALL)
 
 # ---------------------------------------------------------------------------
 # volk  (dynamic Vulkan loader)
@@ -37,10 +36,11 @@ elseif (APPLE)
     set(VOLK_STATIC_DEFINES "VK_USE_PLATFORM_METAL_EXT"
         CACHE STRING "volk platform defines" FORCE)
 endif ()
-set(VOLK_PULL_IN_VULKAN ON  CACHE BOOL "volk finds Vulkan headers" FORCE)
+set(VOLK_PULL_IN_VULKAN OFF CACHE BOOL "" FORCE)
 set(VOLK_INSTALL        OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${ROVER_VENDOR_ROOT}/volk" EXCLUDE_FROM_ALL)
+target_link_libraries(volk PUBLIC Vulkan::Headers)
 
 # ---------------------------------------------------------------------------
 # VulkanMemoryAllocator  (header-only GPU allocator)

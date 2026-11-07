@@ -10,6 +10,7 @@
 
 namespace rover
 {
+    class TransientResourcePool;
 
     // ---------------------------------------------------------------------------
     // FrameGraph: declarative render graph for organizing one frame's worth of
@@ -44,6 +45,11 @@ namespace rover
         // Imports an existing GPU buffer into the graph.
         RenderResourceId import_buffer(std::string name, BufferHandle handle);
 
+        RenderResourceId  create_texture(std::string name, const TextureDesc& desc);
+        RenderResourceId  create_buffer(std::string name, const BufferDesc& desc);
+        RenderBindGroupId create_bind_group(BindGroupLayoutHandle layout, std::vector<RenderBinding> entries);
+        [[nodiscard]] BindGroupHandle bind_group(RenderBindGroupId id) const;
+
         // Creates the next logical version of the same physical resource.
         // Chains are linear; old readers finish before the successor's writer.
         // Each successor needs a writer, and one pass uses only one version.
@@ -68,12 +74,20 @@ namespace rover
                                   const ClearValue& clear,
                                   bool              clear_depth_stencil = false);
 
+        // The pool creates/caches this framebuffer after resources are resolved.
+        void set_render_target(u32               pass_index,
+                               RenderPassHandle  render_pass,
+                               RenderResourceId  color,
+                               const ClearValue& clear,
+                               RenderResourceId  depth = INVALID_RESOURCE_ID);
+
         // ---- Compile / execute ----
 
         // Validates references, version chains and acyclicity, then builds
         // a deterministic topological execution plan. Failure clears the plan.
         // Any subsequent graph mutation requires compilation again.
         bool compile();
+        bool prepare_resources(TransientResourcePool& pool);
 
         // Records all passes onto the device. Each pass gets its own command
         // list. Caller is responsible for calling `device.begin_frame()` before
@@ -102,6 +116,7 @@ namespace rover
 
     private:
         friend class PassBuilder;
+        friend class TransientResourcePool;
 
         bool prepare_mutation();
         void invalidate();
@@ -112,6 +127,7 @@ namespace rover
 
         std::vector<RenderResource>                     resources_;
         std::vector<RenderPassNode>                     passes_;
+        std::vector<RenderBindGroup>                    bind_groups_;
         std::vector<u32>                                execution_order_;
         std::vector<std::vector<u32>>                   dependencies_;
         std::vector<std::vector<RenderResourceBarrier>> barriers_;
@@ -119,6 +135,10 @@ namespace rover
         bool                                            compiled_          = false;
         bool                                            executing_         = false;
         bool                                            declaration_error_ = false;
+        u64                                             prepared_serial_   = 0;
+        TransientResourcePool*                          prepared_pool_     = nullptr;
+        u64                                             prepared_epoch_    = 0;
+        GraphicsDevice*                                 prepared_device_   = nullptr;
     };
 
 } // namespace rover

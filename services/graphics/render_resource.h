@@ -62,6 +62,27 @@ namespace rover
         u32    width  = 0;
         u32    height = 0;
         Format format = Format::UNDEFINED;
+
+        TextureDesc texture_desc{};
+        BufferDesc  buffer_desc{};
+        u32         first_use = 0xFFFFFFFFu;
+        u32         last_use  = 0xFFFFFFFFu;
+    };
+
+    using RenderBindGroupId                           = u32;
+    constexpr RenderBindGroupId INVALID_BIND_GROUP_ID = 0xFFFFFFFFu;
+
+    struct RenderBinding
+    {
+        BindGroupEntry   entry{};
+        RenderResourceId resource = INVALID_RESOURCE_ID;
+    };
+
+    struct RenderBindGroup
+    {
+        BindGroupLayoutHandle      layout = INVALID_HANDLE;
+        std::vector<RenderBinding> entries;
+        BindGroupHandle            handle = INVALID_HANDLE;
     };
 
     struct RenderResourceBarrier

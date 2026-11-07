@@ -95,20 +95,17 @@ namespace rover
         return device_.create_graphics_pipeline(desc);
     }
 
-    BindGroupHandle PostProcessPipeline::make_bindings(TextureHandle texture)
+    RenderBindGroupId PostProcessPipeline::make_bindings(FrameGraph& graph, RenderResourceId texture)
     {
-        BindGroupDesc desc{};
-        desc.layout = bindings_layout_;
-        BindGroupEntry image{};
-        image.binding = 0;
-        image.type    = BindingType::SampledTexture;
-        image.texture = texture;
-        BindGroupEntry sampler{};
-        sampler.binding = 1;
-        sampler.type    = BindingType::Sampler;
-        sampler.sampler = sampler_;
-        desc.entries    = {image, sampler};
-        return device_.create_bind_group(desc);
+        RenderBinding image{};
+        image.entry.binding = 0;
+        image.entry.type    = BindingType::SampledTexture;
+        image.resource      = texture;
+        RenderBinding sampler{};
+        sampler.entry.binding = 1;
+        sampler.entry.type    = BindingType::Sampler;
+        sampler.entry.sampler = sampler_;
+        return graph.create_bind_group(bindings_layout_, {image, sampler});
     }
 
     bool PostProcessPipeline::prepare()
@@ -123,115 +120,46 @@ namespace rover
             ROVER_LOG_ERROR("PostProcessPipeline: invalid device state or target extent");
             return false;
         }
-        bool matches = width == width_ && height == height_ && format == screen_format_ && targets_.size() == count;
-        for (u32 i = 0; i < count && matches; ++i)
+        std::vector<TextureHandle> screens;
+        for (u32 i = 0; i < count; ++i)
         {
-            matches = targets_[i].screen == device_.get_swapchain_texture_at(i);
+            const auto image = device_.get_swapchain_texture_at(i);
+            if (!image)
+            {
+                return false;
+            }
+            screens.push_back(image);
         }
-        if (matches)
+        if (width == width_ && height == height_ && format == screen_format_ && screens == screens_)
         {
             return true;
         }
-
-        device_.wait_idle();
-        std::vector<Target> next;
-        const auto          next_pass     = color_pass(device_, format);
-        const auto          next_pipeline = next_pass ? make_pipeline(next_pass, present_shader_) : INVALID_HANDLE;
-        auto                fail          = [&]() {
-            destroy_targets(next);
-            if (next_pipeline)
-            {
-                device_.destroy_pipeline(next_pipeline);
-            }
+        const auto next_pass     = color_pass(device_, format);
+        const auto next_pipeline = next_pass ? make_pipeline(next_pass, present_shader_) : INVALID_HANDLE;
+        if (!next_pipeline)
+        {
             if (next_pass)
             {
                 device_.destroy_render_pass(next_pass);
             }
-            ROVER_LOG_ERROR("PostProcessPipeline: target rebuild failed; previous targets retained");
+            ROVER_LOG_ERROR("PostProcessPipeline: configuration rebuild failed; previous configuration retained");
             return false;
-        };
-        if (!next_pipeline)
-        {
-            return fail();
         }
-        next.reserve(count);
-        for (u32 i = 0; i < count; ++i)
-        {
-            auto& target  = next.emplace_back();
-            target.screen = device_.get_swapchain_texture_at(i);
-            if (!target.screen)
-            {
-                return fail();
-            }
-            TextureDesc texture{};
-            texture.width  = width;
-            texture.height = height;
-            texture.format = Format::R16G16B16A16_SFLOAT;
-            texture.usage  = TextureUsage::ColorAttachment | TextureUsage::Sampled;
-            target.hdr     = device_.create_texture(texture);
-            texture.format = Format::D32_SFLOAT;
-            texture.usage  = TextureUsage::DepthStencilAttachment;
-            target.depth   = device_.create_texture(texture);
-            texture.format = Format::R8G8B8A8_UNORM;
-            texture.usage  = TextureUsage::ColorAttachment | TextureUsage::Sampled | TextureUsage::TransferSrc;
-            target.ldr     = device_.create_texture(texture);
-            if (!target.hdr || !target.depth || !target.ldr)
-            {
-                return fail();
-            }
-            FramebufferDesc framebuffer{};
-            framebuffer.width             = width;
-            framebuffer.height            = height;
-            framebuffer.render_pass       = scene_pass_;
-            framebuffer.color_attachments = {target.hdr};
-            framebuffer.depth_stencil     = target.depth;
-            target.scene_fb               = device_.create_framebuffer(framebuffer);
-            framebuffer.render_pass       = tone_pass_;
-            framebuffer.color_attachments = {target.ldr};
-            framebuffer.depth_stencil     = INVALID_HANDLE;
-            target.tone_fb                = device_.create_framebuffer(framebuffer);
-            framebuffer.render_pass       = next_pass;
-            framebuffer.color_attachments = {target.screen};
-            target.present_fb             = device_.create_framebuffer(framebuffer);
-            target.tone_bindings          = make_bindings(target.hdr);
-            target.present_bindings       = make_bindings(target.ldr);
-            if (readback_enabled_)
-            {
-                target.readback = device_.create_buffer({static_cast<usize>(width) * height * 4,
-                                                         BufferUsage::Transfer,
-                                                         MemoryUsage::GpuToCpu,
-                                                         "SceneReadback"});
-                if (!target.readback)
-                {
-                    return fail();
-                }
-            }
-            if (!target.scene_fb || !target.tone_fb || !target.present_fb || !target.tone_bindings ||
-                !target.present_bindings)
-            {
-                return fail();
-            }
-        }
-        destroy_targets(targets_);
+        device_.wait_idle();
+        pool_.clear();
         release(device_, present_pipeline_, &GraphicsDevice::destroy_pipeline);
         release(device_, present_pass_, &GraphicsDevice::destroy_render_pass);
-        targets_          = std::move(next);
         present_pass_     = next_pass;
         present_pipeline_ = next_pipeline;
         width_            = width;
         height_           = height;
         screen_format_    = format;
+        screens_          = std::move(screens);
         copied_screen_    = INVALID_HANDLE;
+        readback_buffer_  = INVALID_HANDLE;
         ++generation_;
         ROVER_LOG_INFO("PostProcessPipeline: {}x{}, {} images, generation {}", width_, height_, count, generation_);
         return true;
-    }
-
-    PostProcessPipeline::Target* PostProcessPipeline::find_target(TextureHandle screen)
-    {
-        auto it =
-            std::find_if(targets_.begin(), targets_.end(), [&](const auto& target) { return target.screen == screen; });
-        return it == targets_.end() ? nullptr : &*it;
     }
 
     void PostProcessPipeline::draw_fullscreen(PassExecuteContext& ctx,
@@ -264,39 +192,48 @@ namespace rover
                                          PassExecuteFn       scene_execute,
                                          PostProcessSettings settings)
     {
-        const auto* target = find_target(screen);
-        if (!target || !std::isfinite(settings.exposure) || settings.exposure < 0.0f)
+        if (std::find(screens_.begin(), screens_.end(), screen) == screens_.end() ||
+            !std::isfinite(settings.exposure) || settings.exposure < 0.0f)
         {
             ROVER_LOG_ERROR("PostProcessPipeline: invalid target or exposure");
             return false;
         }
-        const auto hdr = graph.import_texture(
-            "scene.hdr", target->hdr, Format::R16G16B16A16_SFLOAT, width_, height_, target->scene_fb);
-        const auto depth = graph.import_texture("scene.depth", target->depth, Format::D32_SFLOAT, width_, height_);
-        const auto ldr =
-            graph.import_texture("scene.ldr", target->ldr, Format::R8G8B8A8_UNORM, width_, height_, target->tone_fb);
-        const auto output = graph.import_texture("screen", screen, screen_format_, width_, height_, target->present_fb);
-        const auto width  = width_;
-        const auto height = height_;
+        TextureDesc texture{};
+        texture.width               = width_;
+        texture.height              = height_;
+        texture.format              = Format::R16G16B16A16_SFLOAT;
+        texture.usage               = TextureUsage::ColorAttachment | TextureUsage::Sampled;
+        const auto hdr              = graph.create_texture("scene.hdr", texture);
+        texture.format              = Format::D32_SFLOAT;
+        texture.usage               = TextureUsage::DepthStencilAttachment;
+        const auto depth            = graph.create_texture("scene.depth", texture);
+        texture.format              = Format::R8G8B8A8_UNORM;
+        texture.usage               = TextureUsage::ColorAttachment | TextureUsage::Sampled | TextureUsage::TransferSrc;
+        const auto ldr              = graph.create_texture("scene.ldr", texture);
+        const auto output           = graph.import_texture("screen", screen, screen_format_, width_, height_);
+        const auto tone_bindings    = make_bindings(graph, hdr);
+        const auto present_bindings = make_bindings(graph, ldr);
+        const auto width            = width_;
+        const auto height           = height_;
         // Consumers intentionally register first; compilation derives the order.
         const auto present = graph.add_pass(
             "present",
             [=](PassBuilder& b) { b.read(ldr); },
-            [this, bindings = target->present_bindings, width, height, settings](PassExecuteContext& ctx) {
-                draw_fullscreen(ctx, present_pipeline_, bindings, width, height, settings);
+            [this, present_bindings, width, height, settings](PassExecuteContext& ctx) {
+                draw_fullscreen(
+                    ctx, present_pipeline_, ctx.graph.bind_group(present_bindings), width, height, settings);
             });
-        graph.set_color_attachment(present, output, {});
+        graph.set_render_target(present, present_pass_, output, {});
         const auto tone = graph.add_pass(
             "tone_map",
             [=](PassBuilder& b) { b.read(hdr); },
-            [this, bindings = target->tone_bindings, width, height, settings](PassExecuteContext& ctx) {
-                draw_fullscreen(ctx, tone_pipeline_, bindings, width, height, settings);
+            [this, tone_bindings, width, height, settings](PassExecuteContext& ctx) {
+                draw_fullscreen(ctx, tone_pipeline_, ctx.graph.bind_group(tone_bindings), width, height, settings);
             });
-        graph.set_color_attachment(tone, ldr, {});
+        graph.set_render_target(tone, tone_pass_, ldr, {});
         const auto scene = graph.add_pass(
             "forward",
             [=](PassBuilder& b) {
-                b.write(depth, ResourceAccess::DepthStencilAttachment);
                 if (scene_setup)
                 {
                     scene_setup(b);
@@ -307,21 +244,25 @@ namespace rover
         clear.color[0] = 0.05f;
         clear.color[1] = 0.07f;
         clear.color[2] = 0.10f;
-        graph.set_color_attachment(scene, hdr, clear, true);
+        graph.set_render_target(scene, scene_pass_, hdr, clear, depth);
         copied_screen_ = INVALID_HANDLE;
         if (readback_enabled_)
         {
-            const auto buffer = graph.import_buffer("scene.readback", target->readback);
+            const auto buffer = graph.create_buffer(
+                "scene.readback",
+                {static_cast<usize>(width_) * height_ * 4, BufferUsage::Transfer, MemoryUsage::GpuToCpu, nullptr});
             graph.add_pass(
                 "readback",
                 [=](PassBuilder& b) {
                     b.read(ldr, ResourceAccess::TransferRead);
                     b.write(buffer, ResourceAccess::TransferWrite);
                 },
-                [this, screen, texture = target->ldr, buffer = target->readback](PassExecuteContext& ctx) {
-                    if (ctx.device.cmd_copy_texture_to_buffer(ctx.cmd, texture, buffer))
+                [this, screen, ldr, buffer](PassExecuteContext& ctx) {
+                    if (ctx.device.cmd_copy_texture_to_buffer(
+                            ctx.cmd, ctx.graph.resource(ldr).texture, ctx.graph.resource(buffer).buffer))
                     {
-                        copied_screen_ = screen;
+                        copied_screen_   = screen;
+                        readback_buffer_ = ctx.graph.resource(buffer).buffer;
                     }
                 });
             graph.set_final_access(buffer, ResourceAccess::HostRead);
@@ -331,14 +272,13 @@ namespace rover
 
     bool PostProcessPipeline::read_pixels(TextureHandle screen, std::vector<u8>& pixels)
     {
-        const auto* target = find_target(screen);
-        if (!target || !readback_enabled_ || copied_screen_ != screen)
+        if (!readback_buffer_ || !readback_enabled_ || copied_screen_ != screen)
         {
             ROVER_LOG_ERROR("PostProcessPipeline: no completed copy for this image");
             return false;
         }
         device_.wait_idle();
-        const void* data = device_.map_buffer(target->readback);
+        const void* data = device_.map_buffer(readback_buffer_);
         if (!data)
         {
             ROVER_LOG_ERROR("PostProcessPipeline: could not map readback");
@@ -346,25 +286,8 @@ namespace rover
         }
         pixels.resize(static_cast<usize>(width_) * height_ * 4);
         std::memcpy(pixels.data(), data, pixels.size());
-        device_.unmap_buffer(target->readback);
+        device_.unmap_buffer(readback_buffer_);
         return true;
-    }
-
-    void PostProcessPipeline::destroy_targets(std::vector<Target>& targets)
-    {
-        for (auto& target : targets)
-        {
-            release(device_, target.tone_bindings, &GraphicsDevice::destroy_bind_group);
-            release(device_, target.present_bindings, &GraphicsDevice::destroy_bind_group);
-            release(device_, target.scene_fb, &GraphicsDevice::destroy_framebuffer);
-            release(device_, target.tone_fb, &GraphicsDevice::destroy_framebuffer);
-            release(device_, target.present_fb, &GraphicsDevice::destroy_framebuffer);
-            release(device_, target.hdr, &GraphicsDevice::destroy_texture);
-            release(device_, target.depth, &GraphicsDevice::destroy_texture);
-            release(device_, target.ldr, &GraphicsDevice::destroy_texture);
-            release(device_, target.readback, &GraphicsDevice::destroy_buffer);
-        }
-        targets.clear();
     }
 
     void PostProcessPipeline::shutdown()
@@ -373,7 +296,9 @@ namespace rover
         {
             device_.wait_idle();
         }
-        destroy_targets(targets_);
+        pool_.clear();
+        screens_.clear();
+        readback_buffer_ = INVALID_HANDLE;
         release(device_, present_pipeline_, &GraphicsDevice::destroy_pipeline);
         release(device_, tone_pipeline_, &GraphicsDevice::destroy_pipeline);
         release(device_, pipeline_layout_, &GraphicsDevice::destroy_pipeline_layout);
